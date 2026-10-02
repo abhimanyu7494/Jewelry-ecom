@@ -707,7 +707,6 @@ function AdminDashboard() {
 
         <div className="mx-auto max-w-7xl space-y-7">
 
-          {/* ================= CATEGORY ================= */}
 
           <section className={sectionClass}>
 
