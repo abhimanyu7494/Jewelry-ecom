@@ -85,7 +85,8 @@ function Home() {
           TOP SEARCH + FILTER BAR
       ===================================================== */}
 
-      <section className="sticky top-[80px] z-40 border-b border-[#E8E5DD] bg-white/95 shadow-[0_5px_25px_rgba(0,0,0,0.04)] backdrop-blur-xl">
+      <section className="sticky top-[68px] z-40 border-b border-[#E8E5DD] bg-white/95 shadow-[0_5px_25px_rgba(0,0,0,0.04)] backdrop-blur-xl sm:top-[76px]">
+
 
 
         <div className="mx-auto max-w-7xl px-4 py-2 sm:px-6 lg:px-8">
