@@ -335,13 +335,17 @@ function Home() {
           </div>
 
           {categories.length > 0 ? (
-            <div className="flex gap-5 overflow-x-auto px-1 pb-4 scrollbar-hide sm:gap-7 md:gap-8">
+            <div className="flex gap-5 overflow-x-auto px-1 scrollbar-hide sm:gap-5">
   {categories.map((category) => (
-    <CategoryCard
+    <div
       key={category._id}
-      category={category}
-      onClick={handleCategoryClick}
-    />
+      className="w-[160px] shrink-0 sm:w-[200px]"
+    >
+      <CategoryCard
+        category={category}
+        onClick={handleCategoryClick}
+      />
+    </div>
   ))}
 </div>
 

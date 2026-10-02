@@ -18,12 +18,12 @@ body {
   background: #0a0a0a;
   color: #ffffff;
 }
-.category-scroll {
-  scrollbar-width: none;
+
+.scrollbar-hide {
   -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.category-scroll::-webkit-scrollbar {
+.scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
-
