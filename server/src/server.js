@@ -20,12 +20,13 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: "https://earring.vercel.app/",
+    origin: "https://earring.vercel.app",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
+
 
 
 app.use(express.json({ limit: "1mb" }));
