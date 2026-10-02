@@ -638,43 +638,72 @@ function AdminDashboard() {
 
         {/* ================= HEADER ================= */}
 
-        <header className="mx-auto mb-7 max-w-7xl overflow-hidden rounded-[28px] border border-[#E6E1D6] bg-white shadow-[0_15px_50px_rgba(0,0,0,0.07)]">
+        <header className="mx-auto mb-7 max-w-7xl overflow-hidden rounded-[28px] border border-[#E6E1D6] bg-white shadow-[0_15px_50px_rgba(0,0,0,0.07)]"> <div className="relative px-5 py-6 sm:px-8 sm:py-8">
+{/* Gold Accent */}
+<div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
 
-          <div className="relative p-5 sm:p-7">
+<div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
 
-            {/* Gold Accent */}
-            <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent" />
+  {/* LEFT — Dashboard Title */}
+  <div className="min-w-0">
 
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mb-2 flex items-center gap-2">
+      <span className="h-px w-8 bg-[#D4AF37]" />
 
-              <div className="min-w-0">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-[#A17B20]">
+        MyStore
+      </p>
 
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="h-px w-7 bg-[#D4AF37]" />
+      <span className="h-px w-8 bg-[#D4AF37]" />
+    </div>
 
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.35em] text-[#A17B20]">
-                    MyStore
-                  </p>
+    <h1 className="font-['Instrument_Serif'] text-4xl font-normal tracking-wide text-[#202020] sm:text-5xl">
+      Admin Dashboard
+    </h1>
 
-                  <span className="h-px w-7 bg-[#D4AF37]" />
-                </div>
+    <div className="mt-3 h-px w-16 bg-gradient-to-r from-[#D4AF37] to-transparent" />
 
-                <h1 className="font-['Instrument_Serif'] text-4xl font-normal tracking-wide text-[#202020] sm:text-5xl">
-                  Admin Dashboard
-                </h1>
+  </div>
 
-                <p className="mt-2 text-sm text-[#858585]">
-                  Welcome back,{" "}
-                  <span className="font-semibold text-[#A17B20]">
-                    {admin?.username}
-                  </span>
-                </p>
-              </div>
 
-              
-            </div>
-          </div>
-        </header>
+  {/* RIGHT — Welcome Admin */}
+  <div className="flex items-center gap-3 sm:gap-4">
+
+    {/* Avatar */}
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#D4AF37]/40 bg-gradient-to-br from-[#FFF8E5] to-[#F8F4E8] shadow-sm sm:h-14 sm:w-14">
+
+      <span className="font-['Instrument_Serif'] text-xl text-[#A17B20] sm:text-2xl">
+        {admin?.username?.charAt(0)?.toUpperCase() || "A"}
+      </span>
+
+    </div>
+
+    {/* Welcome Text */}
+    <div className="min-w-0">
+
+      <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999]">
+        Welcome back
+      </p>
+
+      <p className="mt-0.5 truncate font-['Instrument_Serif'] text-2xl text-[#222] sm:text-3xl">
+        {admin?.username || "Admin"}
+      </p>
+
+      <div className="mt-1 flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#D4AF37]" />
+
+        <span className="text-[11px] text-[#999]">
+          Administrator
+        </span>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+</div> </header>
 
         <div className="mx-auto max-w-7xl space-y-7">
 
