@@ -335,15 +335,20 @@ function Home() {
           </div>
 
           {categories.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-5">
-              {categories.map((category) => (
-                <CategoryCard
-                  key={category._id}
-                  category={category}
-                  onClick={handleCategoryClick}
-                />
-              ))}
-            </div>
+            <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide sm:gap-5">
+  {categories.map((category) => (
+    <div
+      key={category._id}
+      className="w-[160px] shrink-0 sm:w-[200px]"
+    >
+      <CategoryCard
+        category={category}
+        onClick={handleCategoryClick}
+      />
+    </div>
+  ))}
+</div>
+
           ) : (
             <div className="py-10 text-center text-sm text-[#999999]">
               No categories available
