@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
+import { useEffect, useRef, useState } from "react";
+
 
 function AdminDashboard() {
   const admin = JSON.parse(localStorage.getItem("admin"));
@@ -17,6 +19,7 @@ function AdminDashboard() {
   const [categoryFile, setCategoryFile] = useState(null);
   const [categoryUploading, setCategoryUploading] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const productFormRef = useRef(null);
 
   // =========================
   // Product states
@@ -384,20 +387,39 @@ function AdminDashboard() {
   // Stock
   // =========================
 
-  const updateStock = async (id, action) => {
-    try {
-      await api.patch(`/products/${id}/stock`, {
-        action,
-      });
+ const updateStock = async (id, action) => {
+  // UI ko immediately update karo
+  setProducts((prevProducts) =>
+    prevProducts.map((product) => {
+      if (product._id !== id) return product;
 
-      fetchProducts();
-    } catch (error) {
-      alert(
-        error.response?.data?.message ||
-          "Failed to update stock"
-      );
-    }
-  };
+      const newStock =
+        action === "increase"
+          ? product.stock + 1
+          : Math.max(0, product.stock - 1);
+
+      return {
+        ...product,
+        stock: newStock,
+      };
+    })
+  );
+
+  try {
+    await api.patch(`/products/${id}/stock`, {
+      action,
+    });
+  } catch (error) {
+    // API fail ho to latest data wapas fetch kar lo
+    fetchProducts();
+
+    alert(
+      error.response?.data?.message ||
+        "Failed to update stock"
+    );
+  }
+};
+
 
   // =====================================================
   // POSITION OPTIONS
@@ -891,22 +913,29 @@ function AdminDashboard() {
 
           {/* ================= PRODUCT ================= */}
 
-          <section className={sectionClass}>
+          <section
+  ref={productFormRef}
+  className={sectionClass}
+>
 
-            <div className="mb-7">
 
-              <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#A17B20]">
-                Inventory Management
-              </p>
+            <div
+  ref={productFormRef}
+  className="scroll-mt-6 mb-7"
+>
+  <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-[#A17B20]">
+    Inventory Management
+  </p>
 
-              <h2 className="mt-1 font-['Instrument_Serif'] text-3xl text-[#222] sm:text-4xl">
-                {editingProduct
-                  ? "Edit Product"
-                  : "Add Product"}
-              </h2>
+  <h2 className="mt-1 font-['Instrument_Serif'] text-3xl text-[#222] sm:text-4xl">
+    {editingProduct
+      ? "Edit Product"
+      : "Add Product"}
+  </h2>
 
-              <div className="mt-3 h-px w-12 bg-[#D4AF37]" />
-            </div>
+  <div className="mt-3 h-px w-12 bg-[#D4AF37]" />
+</div>
+
 
             {/* Product Form */}
 
