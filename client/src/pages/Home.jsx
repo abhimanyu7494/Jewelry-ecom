@@ -19,6 +19,21 @@ function Home() {
   }, []);
 
   useEffect(() => {
+  const handleScroll = () => {
+    if (window.scrollY > 10) {
+      setShowFilters(false);
+    }
+  };
+
+  window.addEventListener("scroll", handleScroll, { passive: true });
+
+  return () => {
+    window.removeEventListener("scroll", handleScroll);
+  };
+}, []);
+
+
+  useEffect(() => {
     fetchProducts();
   }, [search, selectedCategory, sort]);
 
