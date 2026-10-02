@@ -329,23 +329,32 @@ function AdminDashboard() {
     }
   };
 
-  const editProduct = (product) => {
-    setEditingProduct(product);
+ const editProduct = (product) => {
+  setEditingProduct(product);
 
-    setProductForm({
-      category: product.category?._id || "",
-      name: product.name,
-      stock: product.stock,
-      buyPrice: product.buyPrice,
-      sellPrice: product.sellPrice,
-      image: product.image,
-      allPosition: product.allPosition ?? "",
-      categoryPosition: product.categoryPosition ?? "",
+  setProductForm({
+    category: product.category?._id || "",
+    name: product.name,
+    stock: product.stock,
+    buyPrice: product.buyPrice,
+    sellPrice: product.sellPrice,
+    image: product.image,
+    allPosition: product.allPosition ?? "",
+    categoryPosition: product.categoryPosition ?? "",
+  });
+
+  setProductPreview(product.image);
+  setProductFile(null);
+
+  // Edit form par smoothly scroll karo
+  setTimeout(() => {
+    productFormRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
     });
+  }, 50);
+};
 
-    setProductPreview(product.image);
-    setProductFile(null);
-  };
 
   const resetProductForm = () => {
     setEditingProduct(null);
@@ -662,27 +671,7 @@ function AdminDashboard() {
                 </p>
               </div>
 
-              <button
-                onClick={logout}
-                className="group flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm font-semibold text-red-500 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-500 hover:text-white sm:w-auto"
-              >
-                <svg
-                  className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.8"
-                    d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"
-                  />
-                </svg>
-
-                Logout
-              </button>
-
+              
             </div>
           </div>
         </header>
