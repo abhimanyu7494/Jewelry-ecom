@@ -12,32 +12,102 @@ function Login() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    setError("");
-    setLoading(true);
+  setError("");
+  setLoading(true);
 
-    try {
-      const response = await api.post("/admin/login", {
-        email,
-        password,
-      });
-
-      localStorage.setItem("token", response.data.token);
-localStorage.setItem("admin", JSON.stringify(response.data.admin));
-
-window.dispatchEvent(new Event("authChanged"));
-
-navigate("/admin");
-
-    } catch (error) {
-      setError(
-        error.response?.data?.message || "Login failed"
-      );
-    } finally {
-      setLoading(false);
-    }
+  const loginData = {
+    email: email.trim().toLowerCase(),
+    password,
   };
+
+  // ==========================================
+  // 1. ADMIN LOGIN
+  // ==========================================
+
+  try {
+    const adminResponse = await api.post(
+      "/admin/login",
+      loginData
+    );
+
+    // Admin login successful
+    if (adminResponse.data?.token && adminResponse.data?.admin) {
+      localStorage.setItem(
+        "token",
+        adminResponse.data.token
+      );
+
+      localStorage.setItem(
+        "admin",
+        JSON.stringify(adminResponse.data.admin)
+      );
+
+      // User session remove
+      localStorage.removeItem("user");
+
+      // Navbar ko update karo
+      window.dispatchEvent(new Event("authChanged"));
+
+      // Admin dashboard
+      navigate("/admin");
+
+      return;
+    }
+
+  } catch (adminError) {
+    // Admin login failed
+    // Ab user login try karenge
+  }
+
+  // ==========================================
+  // 2. USER LOGIN
+  // ==========================================
+
+  try {
+    const userResponse = await api.post(
+      "/auth/login",
+      loginData
+    );
+
+    // User login successful
+    if (userResponse.data?.token && userResponse.data?.user) {
+  localStorage.setItem(
+    "token",
+    userResponse.data.token
+  );
+
+  localStorage.setItem(
+    "user",
+    JSON.stringify(userResponse.data.user)
+  );
+
+  // Admin session clear
+  localStorage.removeItem("admin");
+
+  // Navbar/auth state update
+  window.dispatchEvent(new Event("authChanged"));
+
+  // USER DASHBOARD
+  navigate("/");
+
+  return;
+}
+
+
+    setError("Invalid email or password");
+
+  } catch (userError) {
+    setError(
+      userError.response?.data?.message ||
+        "Invalid email or password"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="relative flex min-h-[calc(100vh-80px)] items-center justify-center overflow-hidden bg-[#FAFAF8] px-4 py-10 sm:px-6 sm:py-16">

@@ -5,6 +5,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
+import UserDashboard from "./pages/UserDashboard";
+
 import AdminDashboard from "./pages/AdminDashboard";
 import CollectionManagement from "./pages/admin/CollectionManagement";
 import ProductManagement from "./pages/admin/ProductManagement";
@@ -15,14 +18,31 @@ function App() {
       <Navbar />
 
       <Routes>
+        {/* ================= PUBLIC ROUTES ================= */}
+
         <Route path="/" element={<Home />} />
 
         <Route path="/login" element={<Login />} />
 
+        <Route path="/register" element={<Register />} />
+
+        {/* ================= USER ROUTES ================= */}
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute type="user">
+              <UserDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================= ADMIN ROUTES ================= */}
+
         <Route
           path="/admin"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute type="admin">
               <AdminDashboard />
             </ProtectedRoute>
           }
@@ -31,7 +51,7 @@ function App() {
         <Route
           path="/admin/collections"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute type="admin">
               <CollectionManagement />
             </ProtectedRoute>
           }
@@ -40,7 +60,7 @@ function App() {
         <Route
           path="/admin/products"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute type="admin">
               <ProductManagement />
             </ProtectedRoute>
           }

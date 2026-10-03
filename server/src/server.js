@@ -11,6 +11,7 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const productRoutes = require("./routes/productRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+const userAuthRoutes = require("./routes/userAuthRoutes");
 
 const app = express();
 
@@ -18,11 +19,12 @@ connectDB();
 
 app.use(helmet());
 
+
 app.use(
   cors({
     origin: 
     "https://earring.vercel.app",
-  //  "http://localhost:5173",
+   // "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -38,6 +40,8 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/upload", uploadRoutes);
+
+app.use("/api/auth", userAuthRoutes);
 
 
 app.get("/", (req, res) => {
