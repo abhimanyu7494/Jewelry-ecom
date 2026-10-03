@@ -6,6 +6,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
+import CollectionManagement from "./pages/admin/CollectionManagement";
+import ProductManagement from "./pages/admin/ProductManagement";
 
 function App() {
   return (
@@ -22,6 +24,24 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/collections"
+          element={
+            <ProtectedRoute>
+              <CollectionManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/products"
+          element={
+            <ProtectedRoute>
+              <ProductManagement />
             </ProtectedRoute>
           }
         />
