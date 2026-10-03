@@ -1,16 +1,18 @@
 const bcrypt = require("bcryptjs");
 const nodemailer = require("nodemailer");
+const jwt = require("jsonwebtoken");
 
 const User = require("../models/User");
 const RegistrationOTP = require("../models/RegistrationOTP");
 
+// ================= OTP GENERATOR =================
 
-// Generate 6 digit OTP
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// SMTP transporter
+// ================= SMTP TRANSPORTER =================
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -19,7 +21,25 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Send OTP
+// ================= SMTP CONNECTION CHECK =================
+
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("========== SMTP VERIFY ERROR ==========");
+    console.error("Name:", error.name);
+    console.error("Message:", error.message);
+    console.error("Code:", error.code);
+    console.error("Command:", error.command);
+    console.error("Response:", error.response);
+    console.error("Response Code:", error.responseCode);
+    console.error("=======================================");
+  } else {
+    console.log("SMTP SERVER READY:", success);
+  }
+});
+
+// ================= SEND REGISTRATION OTP =================
+
 const sendRegistrationOTP = async (req, res) => {
   try {
     const { fullName, email, phone, password } = req.body;
@@ -32,9 +52,11 @@ const sendRegistrationOTP = async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     // Check existing user
     const existingUser = await User.findOne({
-      email: email.toLowerCase(),
+      email: normalizedEmail,
     });
 
     if (existingUser) {
@@ -50,56 +72,98 @@ const sendRegistrationOTP = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Delete previous OTP for this email
-    await RegistrationOTP.deleteMany({
-      email: email.toLowerCase(),
-    });
-
-    // OTP expires in 10 minutes
+    // OTP expiry - 10 minutes
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Save OTP data
-    await RegistrationOTP.create({
-      fullName,
-      email: email.toLowerCase(),
-      phone,
-      password: hashedPassword,
-      otp,
-      expiresAt,
-    });
+    // ================= SEND EMAIL FIRST =================
 
-    // Send email
-    await transporter.sendMail({
+    console.log("Attempting to send OTP email...");
+    console.log("SMTP User:", process.env.SMTP_USER);
+    console.log("Receiver:", normalizedEmail);
+
+    const mailInfo = await transporter.sendMail({
       from: `"Your Store" <${process.env.SMTP_USER}>`,
-      to: email,
+      to: normalizedEmail,
       subject: "Your Registration OTP",
+
       html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <div
+          style="
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: auto;
+          "
+        >
           <h2>Registration Verification</h2>
 
           <p>Hello ${fullName},</p>
 
           <p>Your OTP for registration is:</p>
 
-          <h1 style="letter-spacing: 8px; color: #2563eb;">
+          <h1
+            style="
+              letter-spacing: 8px;
+              color: #2563eb;
+              font-size: 36px;
+            "
+          >
             ${otp}
           </h1>
 
-          <p>This OTP will expire in <b>10 minutes</b>.</p>
+          <p>
+            This OTP will expire in <b>10 minutes</b>.
+          </p>
 
-          <p>If you did not request this OTP, please ignore this email.</p>
+          <p>
+            If you did not request this email, please ignore it.
+          </p>
 
           <p>Thank you.</p>
         </div>
       `,
     });
 
+    console.log("========== EMAIL SENT SUCCESSFULLY ==========");
+    console.log("Message ID:", mailInfo.messageId);
+    console.log("Accepted:", mailInfo.accepted);
+    console.log("Rejected:", mailInfo.rejected);
+    console.log("Response:", mailInfo.response);
+    console.log("=============================================");
+
+    // ================= SAVE OTP ONLY AFTER EMAIL SUCCESS =================
+
+    // Delete previous OTP
+    await RegistrationOTP.deleteMany({
+      email: normalizedEmail,
+    });
+
+    // Save new OTP
+    await RegistrationOTP.create({
+      fullName,
+      email: normalizedEmail,
+      phone,
+      password: hashedPassword,
+      otp,
+      expiresAt,
+      isVerified: false,
+    });
+
     return res.status(200).json({
       success: true,
       message: "OTP sent successfully to your email",
     });
+
   } catch (error) {
-    console.error("Send OTP Error:", error);
+    console.error("========== SEND OTP ERROR ==========");
+    console.error("Name:", error.name);
+    console.error("Message:", error.message);
+    console.error("Code:", error.code);
+    console.error("Command:", error.command);
+    console.error("Response:", error.response);
+    console.error("Response Code:", error.responseCode);
+    console.error("Stack:", error.stack);
+    console.error("====================================");
 
     return res.status(500).json({
       success: false,
@@ -107,6 +171,8 @@ const sendRegistrationOTP = async (req, res) => {
     });
   }
 };
+
+// ================= VERIFY REGISTRATION OTP =================
 
 const verifyRegistrationOTP = async (req, res) => {
   try {
@@ -119,8 +185,10 @@ const verifyRegistrationOTP = async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const registrationData = await RegistrationOTP.findOne({
-      email: email.toLowerCase(),
+      email: normalizedEmail,
     });
 
     if (!registrationData) {
@@ -152,6 +220,7 @@ const verifyRegistrationOTP = async (req, res) => {
 
     // Mark OTP as verified
     registrationData.isVerified = true;
+
     await registrationData.save();
 
     return res.status(200).json({
@@ -159,6 +228,7 @@ const verifyRegistrationOTP = async (req, res) => {
       verified: true,
       message: "OTP verified successfully",
     });
+
   } catch (error) {
     console.error("Verify OTP Error:", error);
 
@@ -168,6 +238,8 @@ const verifyRegistrationOTP = async (req, res) => {
     });
   }
 };
+
+// ================= COMPLETE REGISTRATION =================
 
 const completeRegistration = async (req, res) => {
   try {
@@ -180,8 +252,10 @@ const completeRegistration = async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const registrationData = await RegistrationOTP.findOne({
-      email: email.toLowerCase(),
+      email: normalizedEmail,
       isVerified: true,
     });
 
@@ -192,9 +266,9 @@ const completeRegistration = async (req, res) => {
       });
     }
 
-    // Double-check that email is not already registered
+    // Double-check email
     const existingUser = await User.findOne({
-      email: email.toLowerCase(),
+      email: normalizedEmail,
     });
 
     if (existingUser) {
@@ -225,6 +299,7 @@ const completeRegistration = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Registration completed successfully",
+
       user: {
         id: user._id,
         fullName: user.fullName,
@@ -232,6 +307,7 @@ const completeRegistration = async (req, res) => {
         phone: user.phone,
       },
     });
+
   } catch (error) {
     console.error("Complete Registration Error:", error);
 
@@ -248,7 +324,6 @@ const userLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -292,8 +367,6 @@ const userLogin = async (req, res) => {
     }
 
     // JWT token
-    const jwt = require("jsonwebtoken");
-
     const token = jwt.sign(
       {
         id: user._id,
@@ -320,6 +393,7 @@ const userLogin = async (req, res) => {
         isEmailVerified: user.isEmailVerified,
       },
     });
+
   } catch (error) {
     console.error("User Login Error:", error);
 
@@ -330,6 +404,7 @@ const userLogin = async (req, res) => {
   }
 };
 
+// ================= EXPORT =================
 
 module.exports = {
   sendRegistrationOTP,
@@ -337,6 +412,3 @@ module.exports = {
   completeRegistration,
   userLogin,
 };
-
-
-
