@@ -1,42 +1,19 @@
 const bcrypt = require("bcryptjs");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const jwt = require("jsonwebtoken");
 
 const User = require("../models/User");
 const RegistrationOTP = require("../models/RegistrationOTP");
 
-// ================= OTP GENERATOR =================
+// ================= RESEND EMAIL =================
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// ================= GENERATE OTP =================
 
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
-
-// ================= SMTP TRANSPORTER =================
-
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
-
-// ================= SMTP CONNECTION CHECK =================
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("========== SMTP VERIFY ERROR ==========");
-    console.error("Name:", error.name);
-    console.error("Message:", error.message);
-    console.error("Code:", error.code);
-    console.error("Command:", error.command);
-    console.error("Response:", error.response);
-    console.error("Response Code:", error.responseCode);
-    console.error("=======================================");
-  } else {
-    console.log("SMTP SERVER READY:", success);
-  }
-});
 
 // ================= SEND REGISTRATION OTP =================
 
@@ -72,73 +49,116 @@ const sendRegistrationOTP = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // OTP expiry - 10 minutes
+    // OTP expires in 10 minutes
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // ================= SEND EMAIL FIRST =================
+    console.log("======================================");
+    console.log("Sending registration OTP...");
+    console.log("From:", process.env.EMAIL_FROM);
+    console.log("To:", normalizedEmail);
+    console.log("======================================");
 
-    console.log("Attempting to send OTP email...");
-    console.log("SMTP User:", process.env.SMTP_USER);
-    console.log("Receiver:", normalizedEmail);
+    // ================= SEND EMAIL =================
 
-    const mailInfo = await transporter.sendMail({
-      from: `"Your Store" <${process.env.SMTP_USER}>`,
-      to: normalizedEmail,
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM,
+      to: [normalizedEmail],
       subject: "Your Registration OTP",
 
       html: `
         <div
           style="
             font-family: Arial, sans-serif;
-            padding: 20px;
+            padding: 30px;
             max-width: 600px;
             margin: auto;
+            background-color: #ffffff;
+            color: #333333;
           "
         >
-          <h2>Registration Verification</h2>
 
-          <p>Hello ${fullName},</p>
+          <h2 style="color: #111827;">
+            Registration Verification
+          </h2>
 
-          <p>Your OTP for registration is:</p>
+          <p>
+            Hello <strong>${fullName}</strong>,
+          </p>
 
-          <h1
+          <p>
+            Thank you for registering with us.
+          </p>
+
+          <p>
+            Your OTP for registration is:
+          </p>
+
+          <div
             style="
-              letter-spacing: 8px;
-              color: #2563eb;
-              font-size: 36px;
+              margin: 25px 0;
+              padding: 20px;
+              background-color: #f3f4f6;
+              text-align: center;
+              border-radius: 8px;
             "
           >
-            ${otp}
-          </h1>
+            <h1
+              style="
+                margin: 0;
+                letter-spacing: 10px;
+                color: #2563eb;
+                font-size: 36px;
+              "
+            >
+              ${otp}
+            </h1>
+          </div>
 
           <p>
-            This OTP will expire in <b>10 minutes</b>.
+            This OTP will expire in
+            <strong>10 minutes</strong>.
           </p>
 
           <p>
-            If you did not request this email, please ignore it.
+            If you did not request this registration,
+            please ignore this email.
           </p>
 
-          <p>Thank you.</p>
+          <p>
+            Thank you.
+          </p>
+
         </div>
       `,
     });
 
-    console.log("========== EMAIL SENT SUCCESSFULLY ==========");
-    console.log("Message ID:", mailInfo.messageId);
-    console.log("Accepted:", mailInfo.accepted);
-    console.log("Rejected:", mailInfo.rejected);
-    console.log("Response:", mailInfo.response);
-    console.log("=============================================");
+    // ================= EMAIL ERROR =================
 
-    // ================= SAVE OTP ONLY AFTER EMAIL SUCCESS =================
+    if (error) {
+      console.error("======================================");
+      console.error("RESEND EMAIL ERROR");
+      console.error(error);
+      console.error("======================================");
 
-    // Delete previous OTP
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP email",
+      });
+    }
+
+    console.log("======================================");
+    console.log("OTP EMAIL SENT SUCCESSFULLY");
+    console.log("Email ID:", data?.id);
+    console.log("======================================");
+
+    // ================= DELETE OLD OTP =================
+
     await RegistrationOTP.deleteMany({
       email: normalizedEmail,
     });
 
-    // Save new OTP
+    // ================= SAVE OTP =================
+
     await RegistrationOTP.create({
       fullName,
       email: normalizedEmail,
@@ -155,15 +175,12 @@ const sendRegistrationOTP = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("========== SEND OTP ERROR ==========");
+    console.error("======================================");
+    console.error("SEND OTP ERROR");
     console.error("Name:", error.name);
     console.error("Message:", error.message);
-    console.error("Code:", error.code);
-    console.error("Command:", error.command);
-    console.error("Response:", error.response);
-    console.error("Response Code:", error.responseCode);
     console.error("Stack:", error.stack);
-    console.error("====================================");
+    console.error("======================================");
 
     return res.status(500).json({
       success: false,
@@ -187,6 +204,7 @@ const verifyRegistrationOTP = async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
+    // Find OTP
     const registrationData = await RegistrationOTP.findOne({
       email: normalizedEmail,
     });
@@ -254,6 +272,7 @@ const completeRegistration = async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
+    // Find verified registration
     const registrationData = await RegistrationOTP.findOne({
       email: normalizedEmail,
       isVerified: true,
@@ -266,7 +285,7 @@ const completeRegistration = async (req, res) => {
       });
     }
 
-    // Double-check email
+    // Check if email already exists
     const existingUser = await User.findOne({
       email: normalizedEmail,
     });
@@ -324,6 +343,7 @@ const userLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -366,7 +386,7 @@ const userLogin = async (req, res) => {
       });
     }
 
-    // JWT token
+    // Create JWT
     const token = jwt.sign(
       {
         id: user._id,
