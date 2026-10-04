@@ -12,6 +12,8 @@ const productRoutes = require("./routes/productRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const userAuthRoutes = require("./routes/userAuthRoutes");
+const adminUserRoutes = require("./routes/adminUserRoutes");
+
 
 const app = express();
 
@@ -42,6 +44,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/upload", uploadRoutes);
 
 app.use("/api/auth", userAuthRoutes);
+
+app.use("/api/admin/users", adminUserRoutes);
 
 
 app.get("/", (req, res) => {

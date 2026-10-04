@@ -7,10 +7,12 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import UserDashboard from "./pages/UserDashboard";
+import ProductDetail from "./pages/ProductDetail";
 
 import AdminDashboard from "./pages/AdminDashboard";
 import CollectionManagement from "./pages/admin/CollectionManagement";
 import ProductManagement from "./pages/admin/ProductManagement";
+import AdminUsers from "./pages/admin/AdminUsers";
 
 function App() {
   return (
@@ -25,6 +27,13 @@ function App() {
         <Route path="/login" element={<Login />} />
 
         <Route path="/register" element={<Register />} />
+
+        {/* ================= PRODUCT ROUTES ================= */}
+
+        <Route
+          path="/products/:id"
+          element={<ProductDetail />}
+        />
 
         {/* ================= USER ROUTES ================= */}
 
@@ -62,6 +71,15 @@ function App() {
           element={
             <ProtectedRoute type="admin">
               <ProductManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute type="admin">
+              <AdminUsers />
             </ProtectedRoute>
           }
         />

@@ -66,7 +66,7 @@ function Home() {
         params,
       });
 
-      setProducts(response.data);
+      setProducts(response.data.products);
     } catch (error) {
       console.error("Failed to fetch products:", error);
     }

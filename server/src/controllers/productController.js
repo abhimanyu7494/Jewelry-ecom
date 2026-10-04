@@ -3,10 +3,224 @@ const Product = require("../models/Product");
 const Category = require("../models/Category");
 
 // =====================================================
-// HELPER FUNCTIONS
+// HELPERS
 // =====================================================
 
-// Find first available position from 1...maxPosition
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id);
+};
+
+// =====================================================
+// NORMALIZE POSITION
+// =====================================================
+
+const normalizePosition = (value) => {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const number = Number(value);
+
+  if (
+    !Number.isInteger(number) ||
+    number < 1
+  ) {
+    return null;
+  }
+
+  return number;
+};
+
+// =====================================================
+// NORMALIZE STRING
+// =====================================================
+
+const normalizeString = (value) => {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return "";
+  }
+
+  return String(value).trim();
+};
+
+// =====================================================
+// NORMALIZE OPTIONAL NUMBER
+// =====================================================
+
+const normalizeOptionalNumber = (value) => {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+
+  return number;
+};
+
+// =====================================================
+// NORMALIZE ARRAY
+// =====================================================
+
+const normalizeStringArray = (value) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => String(item).trim())
+    .filter(Boolean);
+};
+
+// =====================================================
+// VALIDATE PRODUCT VALUES
+// =====================================================
+
+const validateProductValues = ({
+  name,
+  stock,
+  buyPrice,
+  sellPrice,
+  image,
+  gender,
+  mrp,
+}) => {
+  // =========================
+  // Name
+  // =========================
+
+  if (
+    typeof name !== "string" ||
+    !name.trim()
+  ) {
+    return "Product name is required";
+  }
+
+  if (name.trim().length < 2) {
+    return "Product name must be at least 2 characters";
+  }
+
+  if (name.trim().length > 150) {
+    return "Product name cannot exceed 150 characters";
+  }
+
+  // =========================
+  // Stock
+  // =========================
+
+  const numericStock = Number(stock);
+
+  if (
+    stock === undefined ||
+    stock === null ||
+    stock === "" ||
+    !Number.isFinite(numericStock) ||
+    !Number.isInteger(numericStock) ||
+    numericStock < 0
+  ) {
+    return "Stock must be a valid non-negative integer";
+  }
+
+  // =========================
+  // Buy Price
+  // =========================
+
+  const numericBuyPrice = Number(buyPrice);
+
+  if (
+    buyPrice === undefined ||
+    buyPrice === null ||
+    buyPrice === "" ||
+    !Number.isFinite(numericBuyPrice) ||
+    numericBuyPrice < 0
+  ) {
+    return "Buy price must be a valid non-negative number";
+  }
+
+  // =========================
+  // Sell Price
+  // =========================
+
+  const numericSellPrice = Number(sellPrice);
+
+  if (
+    sellPrice === undefined ||
+    sellPrice === null ||
+    sellPrice === "" ||
+    !Number.isFinite(numericSellPrice) ||
+    numericSellPrice < 0
+  ) {
+    return "Selling price must be a valid non-negative number";
+  }
+
+  // =========================
+  // MRP
+  // =========================
+
+  if (
+    mrp !== undefined &&
+    mrp !== null &&
+    mrp !== ""
+  ) {
+    const numericMrp = Number(mrp);
+
+    if (
+      !Number.isFinite(numericMrp) ||
+      numericMrp < 0
+    ) {
+      return "MRP must be a valid non-negative number";
+    }
+  }
+
+  // =========================
+  // Image
+  // =========================
+
+  if (
+    typeof image !== "string" ||
+    !image.trim()
+  ) {
+    return "Product image is required";
+  }
+
+  if (image.trim().length > 2000) {
+    return "Product image value is too long";
+  }
+
+  // =========================
+  // Gender
+  // =========================
+
+  if (
+    gender !== undefined &&
+    gender !== null &&
+    gender !== "" &&
+    !["Men", "Women", "Unisex"].includes(gender)
+  ) {
+    return "Gender must be Men, Women or Unisex";
+  }
+
+  return null;
+};
+
+// =====================================================
+// GET AVAILABLE POSITION
+// =====================================================
+
 const getAvailablePosition = async ({
   field,
   categoryId = null,
@@ -57,122 +271,151 @@ const getAvailablePosition = async ({
 };
 
 // =====================================================
-// NORMALIZE POSITION
+// BUILD PRODUCT DATA
 // =====================================================
 
-const normalizePosition = (value) => {
-  if (
-    value === undefined ||
-    value === null ||
-    value === ""
-  ) {
-    return null;
-  }
+const buildProductData = (body) => {
+  const {
+    category,
+    name,
+    brand,
+    sku,
+    shortDescription,
+    description,
 
-  const number = Number(value);
+    stock,
+    buyPrice,
+    sellPrice,
+    mrp,
 
-  if (
-    !Number.isInteger(number) ||
-    number < 1
-  ) {
-    return null;
-  }
+    image,
+    images,
 
-  return number;
-};
+    metal,
+    purity,
+    metalColor,
 
-// =====================================================
-// VALIDATE OBJECT ID
-// =====================================================
+    grossWeight,
+    netWeight,
 
-const isValidObjectId = (id) => {
-  return mongoose.Types.ObjectId.isValid(id);
-};
+    stoneType,
+    stoneWeight,
+    stoneColor,
+    stoneClarity,
 
-// =====================================================
-// VALIDATE PRODUCT VALUES
-// =====================================================
+    sizes,
 
-const validateProductValues = ({
-  name,
-  stock,
-  buyPrice,
-  sellPrice,
-  image,
-}) => {
-  if (
-    typeof name !== "string" ||
-    !name.trim()
-  ) {
-    return "Product name is required";
-  }
+    dimensions,
 
-  if (name.trim().length > 200) {
-    return "Product name is too long";
-  }
+    gender,
+    occasion,
+    certification,
+    warranty,
+    careInstructions,
 
-  if (
-    stock === undefined ||
-    stock === null ||
-    stock === ""
-  ) {
-    return "Stock is required";
-  }
+    allPosition,
+    categoryPosition,
+  } = body;
 
-  if (
-    buyPrice === undefined ||
-    buyPrice === null ||
-    buyPrice === ""
-  ) {
-    return "Buy price is required";
-  }
+  return {
+    category,
 
-  if (
-    sellPrice === undefined ||
-    sellPrice === null ||
-    sellPrice === ""
-  ) {
-    return "Sell price is required";
-  }
+    name: normalizeString(name),
 
-  if (
-    typeof image !== "string" ||
-    !image.trim()
-  ) {
-    return "Product image is required";
-  }
+    brand: normalizeString(brand),
 
-  const numericStock = Number(stock);
-  const numericBuyPrice = Number(buyPrice);
-  const numericSellPrice = Number(sellPrice);
+    sku:
+      normalizeString(sku) || null,
 
-  if (
-    !Number.isFinite(numericStock) ||
-    !Number.isInteger(numericStock) ||
-    numericStock < 0
-  ) {
-    return "Stock must be a valid non-negative integer";
-  }
+    shortDescription:
+      normalizeString(shortDescription),
 
-  if (
-    !Number.isFinite(numericBuyPrice) ||
-    numericBuyPrice < 0
-  ) {
-    return "Buy price must be a valid non-negative number";
-  }
+    description:
+      normalizeString(description),
 
-  if (
-    !Number.isFinite(numericSellPrice) ||
-    numericSellPrice < 0
-  ) {
-    return "Sell price must be a valid non-negative number";
-  }
+    stock: Number(stock),
 
-  if (image.trim().length > 2000) {
-    return "Image value is too long";
-  }
+    buyPrice: Number(buyPrice),
 
-  return null;
+    sellPrice: Number(sellPrice),
+
+    mrp: normalizeOptionalNumber(mrp),
+
+    image: normalizeString(image),
+
+    images:
+      normalizeStringArray(images),
+
+    metal: normalizeString(metal),
+
+    purity: normalizeString(purity),
+
+    metalColor:
+      normalizeString(metalColor),
+
+    grossWeight:
+      normalizeOptionalNumber(grossWeight),
+
+    netWeight:
+      normalizeOptionalNumber(netWeight),
+
+    stoneType:
+      normalizeString(stoneType),
+
+    stoneWeight:
+      normalizeOptionalNumber(stoneWeight),
+
+    stoneColor:
+      normalizeString(stoneColor),
+
+    stoneClarity:
+      normalizeString(stoneClarity),
+
+    sizes:
+      normalizeStringArray(sizes),
+
+    dimensions: {
+      length:
+        normalizeOptionalNumber(
+          dimensions?.length
+        ),
+
+      width:
+        normalizeOptionalNumber(
+          dimensions?.width
+        ),
+
+      height:
+        normalizeOptionalNumber(
+          dimensions?.height
+        ),
+    },
+
+    gender:
+      ["Men", "Women", "Unisex"].includes(
+        gender
+      )
+        ? gender
+        : "Unisex",
+
+    occasion:
+      normalizeString(occasion),
+
+    certification:
+      normalizeString(certification),
+
+    warranty:
+      normalizeString(warranty),
+
+    careInstructions:
+      normalizeString(careInstructions),
+
+    allPosition:
+      normalizePosition(allPosition),
+
+    categoryPosition:
+      normalizePosition(categoryPosition),
+  };
 };
 
 // =====================================================
@@ -188,32 +431,17 @@ const createProduct = async (req, res) => {
       buyPrice,
       sellPrice,
       image,
-      allPosition,
-      categoryPosition,
+      gender,
+      mrp,
     } = req.body;
 
     // =========================
-    // Required Fields
+    // Category Required
     // =========================
 
     if (!category) {
       return res.status(400).json({
         message: "Category is required",
-      });
-    }
-
-    const validationError =
-      validateProductValues({
-        name,
-        stock,
-        buyPrice,
-        sellPrice,
-        image,
-      });
-
-    if (validationError) {
-      return res.status(400).json({
-        message: validationError,
       });
     }
 
@@ -228,11 +456,34 @@ const createProduct = async (req, res) => {
     }
 
     // =========================
+    // Validate Product
+    // =========================
+
+    const validationError =
+      validateProductValues({
+        name,
+        stock,
+        buyPrice,
+        sellPrice,
+        image,
+        gender,
+        mrp,
+      });
+
+    if (validationError) {
+      return res.status(400).json({
+        message: validationError,
+      });
+    }
+
+    // =========================
     // Check Category
     // =========================
 
     const categoryExists =
-      await Category.findById(category);
+      await Category.exists({
+        _id: category,
+      });
 
     if (!categoryExists) {
       return res.status(404).json({
@@ -241,7 +492,7 @@ const createProduct = async (req, res) => {
     }
 
     // =========================
-    // Count Existing Products
+    // Count Products
     // =========================
 
     const totalProducts =
@@ -253,45 +504,47 @@ const createProduct = async (req, res) => {
       });
 
     // =========================
-    // Normalize Positions
+    // Product Data
     // =========================
 
-    let finalAllPosition =
-      normalizePosition(allPosition);
-
-    let finalCategoryPosition =
-      normalizePosition(categoryPosition);
+    const productData =
+      buildProductData(req.body);
 
     // =========================
-    // ALL PRODUCT POSITION
+    // ALL POSITION
     // =========================
 
-    if (finalAllPosition === null) {
-      finalAllPosition =
+    if (
+      productData.allPosition === null
+    ) {
+      productData.allPosition =
         await getAvailablePosition({
           field: "allPosition",
-          maxPosition: totalProducts + 1,
+          maxPosition:
+            totalProducts + 1,
         });
     } else {
       const maxPosition =
         totalProducts + 1;
 
       if (
-        finalAllPosition > maxPosition
+        productData.allPosition >
+        maxPosition
       ) {
         return res.status(400).json({
           message: `All position must be between 1 and ${maxPosition}`,
         });
       }
 
-      const existingProduct =
-        await Product.findOne({
-          allPosition: finalAllPosition,
+      const occupied =
+        await Product.exists({
+          allPosition:
+            productData.allPosition,
         });
 
-      if (existingProduct) {
+      if (occupied) {
         return res.status(400).json({
-          message: `All position ${finalAllPosition} is already occupied`,
+          message: `All position ${productData.allPosition} is already occupied`,
         });
       }
     }
@@ -300,8 +553,10 @@ const createProduct = async (req, res) => {
     // CATEGORY POSITION
     // =========================
 
-    if (finalCategoryPosition === null) {
-      finalCategoryPosition =
+    if (
+      productData.categoryPosition === null
+    ) {
+      productData.categoryPosition =
         await getAvailablePosition({
           field: "categoryPosition",
           categoryId: category,
@@ -313,7 +568,7 @@ const createProduct = async (req, res) => {
         categoryProducts + 1;
 
       if (
-        finalCategoryPosition >
+        productData.categoryPosition >
         maxPosition
       ) {
         return res.status(400).json({
@@ -321,16 +576,33 @@ const createProduct = async (req, res) => {
         });
       }
 
-      const existingProduct =
-        await Product.findOne({
+      const occupied =
+        await Product.exists({
           category,
           categoryPosition:
-            finalCategoryPosition,
+            productData.categoryPosition,
         });
 
-      if (existingProduct) {
+      if (occupied) {
         return res.status(400).json({
-          message: `Category position ${finalCategoryPosition} is already occupied in this category`,
+          message: `Category position ${productData.categoryPosition} is already occupied in this category`,
+        });
+      }
+    }
+
+    // =========================
+    // SKU DUPLICATE CHECK
+    // =========================
+
+    if (productData.sku) {
+      const existingSku =
+        await Product.exists({
+          sku: productData.sku,
+        });
+
+      if (existingSku) {
+        return res.status(409).json({
+          message: "SKU already exists",
         });
       }
     }
@@ -340,34 +612,55 @@ const createProduct = async (req, res) => {
     // =========================
 
     const product =
-      await Product.create({
-        category,
-        name: name.trim(),
-        stock: Number(stock),
-        buyPrice: Number(buyPrice),
-        sellPrice: Number(sellPrice),
-        image: image.trim(),
-        allPosition: finalAllPosition,
-        categoryPosition:
-          finalCategoryPosition,
-      });
-
-    const populatedProduct =
-      await product.populate(
-        "category",
-        "name image"
+      await Product.create(
+        productData
       );
+
+    // =========================
+    // POPULATE CATEGORY
+    // =========================
+
+    await product.populate(
+      "category",
+      "name image"
+    );
 
     return res.status(201).json({
       message:
         "Product created successfully",
-      product: populatedProduct,
+      product,
     });
   } catch (error) {
     console.error(
       "Create product error:",
       error
     );
+
+    // Duplicate key
+    if (error.code === 11000) {
+      if (error.keyPattern?.sku) {
+        return res.status(409).json({
+          message: "SKU already exists",
+        });
+      }
+    }
+
+    // Mongoose validation
+    if (
+      error.name ===
+      "ValidationError"
+    ) {
+      const messages = Object.values(
+        error.errors
+      ).map(
+        (item) => item.message
+      );
+
+      return res.status(400).json({
+        message: messages[0] ||
+          "Product validation failed",
+      });
+    }
 
     return res.status(500).json({
       message: "Failed to create product",
@@ -385,12 +678,16 @@ const getProducts = async (req, res) => {
       search = "",
       category = "",
       sort = "",
+      gender = "",
+      metal = "",
+      page = 1,
+      limit = 24,
     } = req.query;
 
     const productQuery = {};
 
     // =========================
-    // Category Filter
+    // Category
     // =========================
 
     if (category) {
@@ -401,7 +698,9 @@ const getProducts = async (req, res) => {
       }
 
       const categoryExists =
-        await Category.findById(category);
+        await Category.exists({
+          _id: category,
+        });
 
       if (!categoryExists) {
         return res.status(404).json({
@@ -409,7 +708,8 @@ const getProducts = async (req, res) => {
         });
       }
 
-      productQuery.category = category;
+      productQuery.category =
+        category;
     }
 
     // =========================
@@ -420,18 +720,19 @@ const getProducts = async (req, res) => {
       typeof search === "string" &&
       search.trim()
     ) {
-      // Escape regex special characters.
-      const escapedSearch = search
-        .trim()
-        .replace(
-          /[.*+?^${}()|[\]\\]/g,
-          "\\$&"
-        );
+      const escapedSearch =
+        search
+          .trim()
+          .replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+          );
 
-      const searchRegex = new RegExp(
-        escapedSearch,
-        "i"
-      );
+      const searchRegex =
+        new RegExp(
+          escapedSearch,
+          "i"
+        );
 
       const matchingCategories =
         await Category.find({
@@ -440,12 +741,18 @@ const getProducts = async (req, res) => {
 
       const categoryIds =
         matchingCategories.map(
-          (cat) => cat._id
+          (item) => item._id
         );
 
       productQuery.$or = [
         {
           name: searchRegex,
+        },
+        {
+          brand: searchRegex,
+        },
+        {
+          sku: searchRegex,
         },
         {
           category: {
@@ -456,55 +763,137 @@ const getProducts = async (req, res) => {
     }
 
     // =========================
-    // Price Sort
+    // Gender
     // =========================
 
-    if (sort === "price_asc") {
-      const products =
-        await Product.find(productQuery)
-          .populate(
-            "category",
-            "name image"
-          )
-          .sort({
-            sellPrice: 1,
-            createdAt: -1,
-          });
+    if (gender) {
+      if (
+        !["Men", "Women", "Unisex"].includes(
+          gender
+        )
+      ) {
+        return res.status(400).json({
+          message: "Invalid gender",
+        });
+      }
 
-      return res.status(200).json(products);
+      productQuery.gender =
+        gender;
+    }
+
+    // =========================
+    // Metal
+    // =========================
+
+    if (
+      typeof metal === "string" &&
+      metal.trim()
+    ) {
+      productQuery.metal =
+        new RegExp(
+          metal.trim().replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+          ),
+          "i"
+        );
+    }
+
+    // =========================
+    // Pagination
+    // =========================
+
+    const pageNumber = Math.max(
+      1,
+      Number(page) || 1
+    );
+
+    const limitNumber = Math.min(
+      100,
+      Math.max(
+        1,
+        Number(limit) || 24
+      )
+    );
+
+    const skip =
+      (pageNumber - 1) *
+      limitNumber;
+
+    // =========================
+    // Sort
+    // =========================
+
+    let sortOption = {
+      allPosition: 1,
+      createdAt: -1,
+    };
+
+    if (sort === "price_asc") {
+      sortOption = {
+        sellPrice: 1,
+        createdAt: -1,
+      };
     }
 
     if (sort === "price_desc") {
-      const products =
-        await Product.find(productQuery)
+      sortOption = {
+        sellPrice: -1,
+        createdAt: -1,
+      };
+    }
+
+    if (sort === "newest") {
+      sortOption = {
+        createdAt: -1,
+      };
+    }
+
+    if (sort === "name_asc") {
+      sortOption = {
+        name: 1,
+      };
+    }
+
+    // =========================
+    // Query
+    // =========================
+
+    const [products, total] =
+      await Promise.all([
+        Product.find(productQuery)
           .populate(
             "category",
             "name image"
           )
-          .sort({
-            sellPrice: -1,
-            createdAt: -1,
-          });
+          .sort(sortOption)
+          .skip(skip)
+          .limit(limitNumber)
+          .lean(),
 
-      return res.status(200).json(products);
-    }
+        Product.countDocuments(
+          productQuery
+        ),
+      ]);
 
-    // =========================
-    // Default Position Sort
-    // =========================
-
-    const products =
-      await Product.find(productQuery)
-        .populate(
-          "category",
-          "name image"
-        )
-        .sort({
-          allPosition: 1,
-          createdAt: -1,
-        });
-
-    return res.status(200).json(products);
+    return res.status(200).json({
+      products,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        total,
+        totalPages: Math.ceil(
+          total / limitNumber
+        ),
+        hasNextPage:
+          pageNumber <
+          Math.ceil(
+            total / limitNumber
+          ),
+        hasPreviousPage:
+          pageNumber > 1,
+      },
+    });
   } catch (error) {
     console.error(
       "Get products error:",
@@ -523,21 +912,21 @@ const getProducts = async (req, res) => {
 
 const getProduct = async (req, res) => {
   try {
-    if (
-      !isValidObjectId(req.params.id)
-    ) {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         message: "Invalid product ID",
       });
     }
 
     const product =
-      await Product.findById(
-        req.params.id
-      ).populate(
-        "category",
-        "name image"
-      );
+      await Product.findById(id)
+        .populate(
+          "category",
+          "name image"
+        )
+        .lean();
 
     if (!product) {
       return res.status(404).json({
@@ -545,7 +934,9 @@ const getProduct = async (req, res) => {
       });
     }
 
-    return res.status(200).json(product);
+    return res.status(200).json(
+      product
+    );
   } catch (error) {
     console.error(
       "Get product error:",
@@ -553,10 +944,12 @@ const getProduct = async (req, res) => {
     );
 
     return res.status(500).json({
-      message: "Failed to get product",
+      message:
+        "Failed to get product",
     });
   }
 };
+
 
 // =====================================================
 // UPDATE PRODUCT
@@ -564,76 +957,23 @@ const getProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
-    const {
-      category,
-      name,
-      stock,
-      buyPrice,
-      sellPrice,
-      image,
-      allPosition,
-      categoryPosition,
-    } = req.body;
+    const { id } = req.params;
 
-    // =========================
-    // Validate Product ID
-    // =========================
+    // =================================================
+    // VALIDATE PRODUCT ID
+    // =================================================
 
-    if (
-      !isValidObjectId(req.params.id)
-    ) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         message: "Invalid product ID",
       });
     }
 
-    // =========================
-    // Required Category
-    // =========================
+    // =================================================
+    // FIND CURRENT PRODUCT
+    // =================================================
 
-    if (!category) {
-      return res.status(400).json({
-        message: "Category is required",
-      });
-    }
-
-    // =========================
-    // Validate Product Values
-    // =========================
-
-    const validationError =
-      validateProductValues({
-        name,
-        stock,
-        buyPrice,
-        sellPrice,
-        image,
-      });
-
-    if (validationError) {
-      return res.status(400).json({
-        message: validationError,
-      });
-    }
-
-    // =========================
-    // Validate Category ID
-    // =========================
-
-    if (!isValidObjectId(category)) {
-      return res.status(400).json({
-        message: "Invalid category",
-      });
-    }
-
-    // =========================
-    // Current Product
-    // =========================
-
-    const currentProduct =
-      await Product.findById(
-        req.params.id
-      );
+    const currentProduct = await Product.findById(id);
 
     if (!currentProduct) {
       return res.status(404).json({
@@ -641,12 +981,40 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    // =========================
-    // Check Category
-    // =========================
+    // =================================================
+    // BASIC REQUIRED FIELDS
+    // =================================================
 
-    const categoryExists =
-      await Category.findById(category);
+    const {
+      category,
+      name,
+      stock,
+      buyPrice,
+      sellPrice,
+      image,
+      gender,
+      mrp,
+    } = req.body;
+
+    // =================================================
+    // CATEGORY VALIDATION
+    // =================================================
+
+    if (!category) {
+      return res.status(400).json({
+        message: "Category is required",
+      });
+    }
+
+    if (!isValidObjectId(category)) {
+      return res.status(400).json({
+        message: "Invalid category",
+      });
+    }
+
+    const categoryExists = await Category.exists({
+      _id: category,
+    });
 
     if (!categoryExists) {
       return res.status(404).json({
@@ -654,55 +1022,66 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    // =========================
-    // Total Products
-    // =========================
-
-    const totalProducts =
-      await Product.countDocuments();
-
-    // =========================
-    // Normalize Positions
-    // =========================
-
-    let finalAllPosition =
-      normalizePosition(allPosition);
-
-    let finalCategoryPosition =
-      normalizePosition(categoryPosition);
-
     // =================================================
-    // ALL POSITION
+    // PRODUCT VALIDATION
     // =================================================
 
-    if (finalAllPosition === null) {
-      finalAllPosition =
+    const validationError = validateProductValues({
+      name,
+      stock,
+      buyPrice,
+      sellPrice,
+      image,
+      gender,
+      mrp,
+    });
+
+    if (validationError) {
+      return res.status(400).json({
+        message: validationError,
+      });
+    }
+
+    // =================================================
+    // BUILD PRODUCT DATA
+    // =================================================
+
+    const productData = buildProductData(req.body);
+
+    // =================================================
+    // TOTAL PRODUCTS
+    // =================================================
+
+    const totalProducts = await Product.countDocuments();
+
+    // =================================================
+    // ALL PRODUCT POSITION
+    // =================================================
+
+    if (productData.allPosition === null) {
+      productData.allPosition =
         await getAvailablePosition({
           field: "allPosition",
-          excludeId: req.params.id,
+          excludeId: id,
           maxPosition: totalProducts,
         });
     } else {
-      if (
-        finalAllPosition > totalProducts
-      ) {
+      if (productData.allPosition > totalProducts) {
         return res.status(400).json({
           message: `All position must be between 1 and ${totalProducts}`,
         });
       }
 
-      const existingProduct =
-        await Product.findOne({
-          allPosition:
-            finalAllPosition,
-          _id: {
-            $ne: req.params.id,
-          },
-        });
+      const occupied = await Product.exists({
+        allPosition: productData.allPosition,
+        _id: {
+          $ne: id,
+        },
+      });
 
-      if (existingProduct) {
+      if (occupied) {
         return res.status(400).json({
-          message: `All position ${finalAllPosition} is already occupied`,
+          message: `All position ${productData.allPosition} is already occupied`,
         });
       }
     }
@@ -715,22 +1094,21 @@ const updateProduct = async (req, res) => {
       await Product.countDocuments({
         category,
         _id: {
-          $ne: req.params.id,
+          $ne: id,
         },
       });
 
-    if (finalCategoryPosition === null) {
-      finalCategoryPosition =
+    if (productData.categoryPosition === null) {
+      productData.categoryPosition =
         await getAvailablePosition({
           field: "categoryPosition",
           categoryId: category,
-          excludeId: req.params.id,
-          maxPosition:
-            targetCategoryCount + 1,
+          excludeId: id,
+          maxPosition: targetCategoryCount + 1,
         });
     } else {
       if (
-        finalCategoryPosition >
+        productData.categoryPosition >
         targetCategoryCount + 1
       ) {
         return res.status(400).json({
@@ -740,42 +1118,49 @@ const updateProduct = async (req, res) => {
         });
       }
 
-      const existingProduct =
-        await Product.findOne({
-          category,
-          categoryPosition:
-            finalCategoryPosition,
-          _id: {
-            $ne: req.params.id,
-          },
-        });
+      const occupied = await Product.exists({
+        category,
+        categoryPosition:
+          productData.categoryPosition,
+        _id: {
+          $ne: id,
+        },
+      });
 
-      if (existingProduct) {
+      if (occupied) {
         return res.status(400).json({
-          message: `Category position ${finalCategoryPosition} is already occupied in this category`,
+          message: `Category position ${productData.categoryPosition} is already occupied in this category`,
         });
       }
     }
 
     // =================================================
-    // UPDATE
+    // SKU DUPLICATE CHECK
     // =================================================
 
-    const product =
-      await Product.findByIdAndUpdate(
-        req.params.id,
-        {
-          category,
-          name: name.trim(),
-          stock: Number(stock),
-          buyPrice: Number(buyPrice),
-          sellPrice: Number(sellPrice),
-          image: image.trim(),
-          allPosition:
-            finalAllPosition,
-          categoryPosition:
-            finalCategoryPosition,
+    if (productData.sku) {
+      const existingSku = await Product.exists({
+        sku: productData.sku,
+        _id: {
+          $ne: id,
         },
+      });
+
+      if (existingSku) {
+        return res.status(409).json({
+          message: "SKU already exists",
+        });
+      }
+    }
+
+    // =================================================
+    // UPDATE PRODUCT
+    // =================================================
+
+    const updatedProduct =
+      await Product.findByIdAndUpdate(
+        id,
+        productData,
         {
           new: true,
           runValidators: true,
@@ -785,10 +1170,23 @@ const updateProduct = async (req, res) => {
         "name image"
       );
 
+    // =================================================
+    // SAFETY CHECK
+    // =================================================
+
+    if (!updatedProduct) {
+      return res.status(404).json({
+        message: "Product not found",
+      });
+    }
+
+    // =================================================
+    // SUCCESS RESPONSE
+    // =================================================
+
     return res.status(200).json({
-      message:
-        "Product updated successfully",
-      product,
+      message: "Product updated successfully",
+      product: updatedProduct,
     });
   } catch (error) {
     console.error(
@@ -796,36 +1194,88 @@ const updateProduct = async (req, res) => {
       error
     );
 
+    // =================================================
+    // DUPLICATE KEY
+    // =================================================
+
+    if (error.code === 11000) {
+      if (error.keyPattern?.sku) {
+        return res.status(409).json({
+          message: "SKU already exists",
+        });
+      }
+
+      return res.status(409).json({
+        message: "Duplicate product value",
+      });
+    }
+
+    // =================================================
+    // MONGOOSE VALIDATION
+    // =================================================
+
+    if (error.name === "ValidationError") {
+      const messages = Object.values(
+        error.errors
+      ).map((item) => item.message);
+
+      return res.status(400).json({
+        message:
+          messages[0] ||
+          "Product validation failed",
+      });
+    }
+
+    // =================================================
+    // CAST ERROR
+    // =================================================
+
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        message: `Invalid value for ${error.path}`,
+      });
+    }
+
+    // =================================================
+    // SERVER ERROR
+    // =================================================
+
     return res.status(500).json({
       message: "Failed to update product",
     });
   }
 };
 
+
 // =====================================================
 // DELETE PRODUCT
 // =====================================================
 
-const deleteProduct = async (req, res) => {
+const deleteProduct = async (
+  req,
+  res
+) => {
   try {
-    if (
-      !isValidObjectId(req.params.id)
-    ) {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         message: "Invalid product ID",
       });
     }
 
     const product =
-      await Product.findByIdAndDelete(
-        req.params.id
-      );
+      await Product.findById(id);
 
     if (!product) {
       return res.status(404).json({
         message: "Product not found",
       });
     }
+
+    await Product.deleteOne({
+      _id: id,
+    });
 
     return res.status(200).json({
       message:
@@ -848,21 +1298,27 @@ const deleteProduct = async (req, res) => {
 // UPDATE STOCK
 // =====================================================
 
-const updateStock = async (req, res) => {
+const updateStock = async (
+  req,
+  res
+) => {
   try {
+    const { id } = req.params;
+    const { action } = req.body;
+
     // =========================
-    // Validate Product ID
+    // Product ID
     // =========================
 
-    if (
-      !isValidObjectId(req.params.id)
-    ) {
+    if (!isValidObjectId(id)) {
       return res.status(400).json({
         message: "Invalid product ID",
       });
     }
 
-    const { action } = req.body;
+    // =========================
+    // Action
+    // =========================
 
     if (
       !["increase", "decrease"].includes(
@@ -875,47 +1331,80 @@ const updateStock = async (req, res) => {
       });
     }
 
-    const product =
-      await Product.findById(
-        req.params.id
-      );
-
-    if (!product) {
-      return res.status(404).json({
-        message: "Product not found",
-      });
-    }
-
     // =========================
-    // Increase
+    // Atomic Stock Update
     // =========================
+
+    let updatedProduct;
 
     if (action === "increase") {
-      product.stock += 1;
+      updatedProduct =
+        await Product.findOneAndUpdate(
+          {
+            _id: id,
+          },
+          {
+            $inc: {
+              stock: 1,
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
     }
 
-    // =========================
-    // Decrease
-    // =========================
-
     if (action === "decrease") {
-      if (product.stock <= 0) {
+      updatedProduct =
+        await Product.findOneAndUpdate(
+          {
+            _id: id,
+            stock: {
+              $gt: 0,
+            },
+          },
+          {
+            $inc: {
+              stock: -1,
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
+
+      if (!updatedProduct) {
+        const exists =
+          await Product.exists({
+            _id: id,
+          });
+
+        if (!exists) {
+          return res.status(404).json({
+            message:
+              "Product not found",
+          });
+        }
+
         return res.status(400).json({
           message:
             "Stock cannot be less than 0",
         });
       }
-
-      product.stock -= 1;
     }
 
-    await product.save();
+    if (!updatedProduct) {
+      return res.status(404).json({
+        message: "Product not found",
+      });
+    }
 
-    const updatedProduct =
-      await product.populate(
-        "category",
-        "name image"
-      );
+    await updatedProduct.populate(
+      "category",
+      "name image"
+    );
 
     return res.status(200).json({
       message:

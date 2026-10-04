@@ -12,16 +12,28 @@ const {
 
 const router = express.Router();
 
-router.post("/", protect, createProduct);
+// =====================================================
+// PUBLIC
+// =====================================================
 
 router.get("/", getProducts);
 
 router.get("/:id", getProduct);
 
+// =====================================================
+// ADMIN / PROTECTED
+// =====================================================
+
+router.post("/", protect, createProduct);
+
 router.put("/:id", protect, updateProduct);
 
 router.delete("/:id", protect, deleteProduct);
 
-router.patch("/:id/stock", protect, updateStock);
+router.patch(
+  "/:id/stock",
+  protect,
+  updateStock
+);
 
 module.exports = router;

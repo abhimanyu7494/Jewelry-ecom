@@ -55,6 +55,20 @@ function AdminNavbar() {
             Manage Products
           </button>
 
+          {/* Users */}
+<button
+  type="button"
+  onClick={() => navigate("/admin/users")}
+  className={`${baseButton} ${
+    isActive("/admin/users")
+      ? activeButton
+      : inactiveButton
+  }`}
+>
+  Manage Users
+</button>
+
+
         </div>
       </nav>
     </div>
