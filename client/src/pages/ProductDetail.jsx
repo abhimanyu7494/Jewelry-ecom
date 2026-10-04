@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import api from "../api";
 
 function ProductDetail() {
   const { id } = useParams();
@@ -7,15 +8,20 @@ function ProductDetail() {
 
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [relatedLoading, setRelatedLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedImage, setSelectedImage] = useState("");
 
+  const [selectedImage, setSelectedImage] = useState("");
   const [quantity, setQuantity] = useState(1);
 
-  // Zoom states
+  // =========================
+  // ZOOM STATES
+  // =========================
+
   const [isZoomed, setIsZoomed] = useState(false);
+
   const [zoomPosition, setZoomPosition] = useState({
     x: 50,
     y: 50,
@@ -24,105 +30,177 @@ function ProductDetail() {
   const imageContainerRef = useRef(null);
   const lastTapRef = useRef(0);
 
-  /*
-   * =========================
-   * FETCH PRODUCT
-   * =========================
-   */
+  // =========================
+  // FETCH PRODUCT
+  // =========================
+
   useEffect(() => {
     const fetchProduct = async () => {
+      if (!id) return;
+
       try {
         setLoading(true);
         setError("");
 
-        const response = await fetch(
-          `http://localhost:5000/api/products/${id}`
-        );
+        /*
+         * IMPORTANT:
+         * Axios instance use ho raha hai.
+         *
+         * api.js:
+         * baseURL = https://jewelry-e-com.onrender.com/api
+         *
+         * Therefore:
+         * /products/${id}
+         * becomes:
+         * https://jewelry-e-com.onrender.com/api/products/${id}
+         */
+        const response = await api.get(`/products/${id}`);
 
-        if (!response.ok) {
+        const data = response.data;
+
+        const productData =
+          data?.product ||
+          data?.data ||
+          data;
+
+        if (!productData || !productData._id) {
           throw new Error("Product not found");
         }
 
-        const data = await response.json();
-
-        const productData = data.product || data.data || data;
-
         setProduct(productData);
-        setSelectedImage(productData.image || "");
+
+        setSelectedImage(
+          productData.image ||
+            productData.images?.[0] ||
+            ""
+        );
+
         setQuantity(1);
       } catch (err) {
         console.error("Product detail error:", err);
-        setError(err.message || "Unable to load product");
+
+        const message =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          "Unable to load product";
+
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) {
-      fetchProduct();
-    }
+    fetchProduct();
   }, [id]);
 
-  /*
-   * =========================
-   * FETCH RELATED PRODUCTS
-   * =========================
-   */
+  // =========================
+  // GET CATEGORY NAME
+  // Handles both:
+  // category: "Rings"
+  //
+  // and:
+  // category: {
+  //   name: "Rings"
+  // }
+  // =========================
+
+  const getCategoryName = (item) => {
+    if (!item?.category) {
+      return "";
+    }
+
+    if (typeof item.category === "string") {
+      return item.category.trim().toLowerCase();
+    }
+
+    return String(
+      item.category.name ||
+        item.category.title ||
+        ""
+    )
+      .trim()
+      .toLowerCase();
+  };
+
+  // =========================
+  // FETCH RELATED PRODUCTS
+  // =========================
+
   useEffect(() => {
     const fetchRelatedProducts = async () => {
-      if (!product) return;
+      if (!product?._id) {
+        return;
+      }
 
       try {
         setRelatedLoading(true);
 
-        const response = await fetch(
-          "http://localhost:5000/api/products"
-        );
+        /*
+         * IMPORTANT:
+         * No localhost here.
+         *
+         * This uses the same live Axios API.
+         */
+        const response = await api.get("/products");
 
-        if (!response.ok) {
-          throw new Error("Unable to load related products");
-        }
+        const data = response.data;
 
-        const data = await response.json();
-
-        const productsData =
-          data.products ||
-          data.data ||
-          data.results ||
+        let productsData =
+          data?.products ||
+          data?.data ||
+          data?.results ||
           (Array.isArray(data) ? data : []);
 
-        /*
-         * Current product ko exclude kar rahe hain.
-         */
-        let filteredProducts = productsData.filter(
-          (item) => String(item._id) !== String(product._id)
-        );
-
-        /*
-         * Pehle same category wale products.
-         */
-        if (product.category) {
-          const sameCategory = filteredProducts.filter(
-            (item) =>
-              String(item.category || "").toLowerCase() ===
-              String(product.category || "").toLowerCase()
-          );
-
-          const otherProducts = filteredProducts.filter(
-            (item) =>
-              String(item.category || "").toLowerCase() !==
-              String(product.category || "").toLowerCase()
-          );
-
-          filteredProducts = [...sameCategory, ...otherProducts];
+        if (!Array.isArray(productsData)) {
+          productsData = [];
         }
 
-        /*
-         * Maximum 8 products show karenge.
-         */
-        setRelatedProducts(filteredProducts.slice(0, 8));
+        // Current product exclude
+        let filteredProducts = productsData.filter(
+          (item) =>
+            String(item?._id) !==
+            String(product?._id)
+        );
+
+        // =========================
+        // SAME CATEGORY FIRST
+        // =========================
+
+        const currentCategory =
+          getCategoryName(product);
+
+        if (currentCategory) {
+          const sameCategory =
+            filteredProducts.filter(
+              (item) =>
+                getCategoryName(item) ===
+                currentCategory
+            );
+
+          const otherProducts =
+            filteredProducts.filter(
+              (item) =>
+                getCategoryName(item) !==
+                currentCategory
+            );
+
+          filteredProducts = [
+            ...sameCategory,
+            ...otherProducts,
+          ];
+        }
+
+        // Maximum 8 related products
+        setRelatedProducts(
+          filteredProducts.slice(0, 8)
+        );
       } catch (err) {
-        console.error("Related products error:", err);
+        console.error(
+          "Related products error:",
+          err
+        );
+
         setRelatedProducts([]);
       } finally {
         setRelatedLoading(false);
@@ -132,35 +210,50 @@ function ProductDetail() {
     fetchRelatedProducts();
   }, [product]);
 
-  /*
-   * =========================
-   * RESET ZOOM WHEN IMAGE CHANGES
-   * =========================
-   */
+  // =========================
+  // RESET ZOOM WHEN IMAGE CHANGES
+  // =========================
+
   useEffect(() => {
     setIsZoomed(false);
+
     setZoomPosition({
       x: 50,
       y: 50,
     });
   }, [selectedImage]);
 
-  /*
-   * =========================
-   * DESKTOP MOUSE ZOOM
-   * =========================
-   */
+  // =========================
+  // DESKTOP MOUSE ZOOM
+  // =========================
+
   const handleMouseMove = (event) => {
-    if (!imageContainerRef.current) return;
+    if (!imageContainerRef.current) {
+      return;
+    }
 
-    const rect = imageContainerRef.current.getBoundingClientRect();
+    const rect =
+      imageContainerRef.current.getBoundingClientRect();
 
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
-    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    const x =
+      ((event.clientX - rect.left) /
+        rect.width) *
+      100;
+
+    const y =
+      ((event.clientY - rect.top) /
+        rect.height) *
+      100;
 
     setZoomPosition({
-      x: Math.max(0, Math.min(100, x)),
-      y: Math.max(0, Math.min(100, y)),
+      x: Math.max(
+        0,
+        Math.min(100, x)
+      ),
+      y: Math.max(
+        0,
+        Math.min(100, y)
+      ),
     });
 
     setIsZoomed(true);
@@ -175,78 +268,105 @@ function ProductDetail() {
     });
   };
 
-  /*
-   * =========================
-   * MOBILE DOUBLE TAP ZOOM
-   * =========================
-   */
+  // =========================
+  // MOBILE DOUBLE TAP ZOOM
+  // =========================
+
   const handleTouchEnd = (event) => {
     const now = Date.now();
+
     const DOUBLE_TAP_DELAY = 300;
 
-    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+    if (
+      now - lastTapRef.current <
+      DOUBLE_TAP_DELAY
+    ) {
       event.preventDefault();
 
-      setIsZoomed((prev) => !prev);
+      const nextZoomState = !isZoomed;
 
-      if (!isZoomed) {
-        const touch = event.changedTouches?.[0];
+      if (
+        nextZoomState &&
+        imageContainerRef.current
+      ) {
+        const touch =
+          event.changedTouches?.[0];
 
-        if (touch && imageContainerRef.current) {
+        if (touch) {
           const rect =
             imageContainerRef.current.getBoundingClientRect();
 
           const x =
-            ((touch.clientX - rect.left) / rect.width) * 100;
+            ((touch.clientX - rect.left) /
+              rect.width) *
+            100;
 
           const y =
-            ((touch.clientY - rect.top) / rect.height) * 100;
+            ((touch.clientY - rect.top) /
+              rect.height) *
+            100;
 
           setZoomPosition({
-            x: Math.max(0, Math.min(100, x)),
-            y: Math.max(0, Math.min(100, y)),
+            x: Math.max(
+              0,
+              Math.min(100, x)
+            ),
+            y: Math.max(
+              0,
+              Math.min(100, y)
+            ),
           });
         }
       }
+
+      setIsZoomed(nextZoomState);
     }
 
     lastTapRef.current = now;
   };
 
-  /*
-   * =========================
-   * QUANTITY
-   * =========================
-   */
+  // =========================
+  // QUANTITY
+  // =========================
+
   const increaseQuantity = () => {
-    if (quantity < Number(product.stock || 0)) {
-      setQuantity((prev) => prev + 1);
+    const stock = Number(
+      product?.stock || 0
+    );
+
+    if (quantity < stock) {
+      setQuantity(
+        (prev) => prev + 1
+      );
     }
   };
 
   const decreaseQuantity = () => {
-    setQuantity((prev) => Math.max(1, prev - 1));
+    setQuantity(
+      (prev) =>
+        Math.max(1, prev - 1)
+    );
   };
 
-  /*
-   * =========================
-   * ADD TO CART
-   * =========================
-   */
+  // =========================
+  // ADD TO CART
+  // =========================
+
   const handleAddToCart = () => {
     console.log("Add to cart:", {
-      productId: product._id,
+      productId: product?._id,
       quantity,
     });
 
-    // Yahan tumhara cart API/function connect hoga.
+    /*
+     * Yahan tum apna cart API/function connect kar sakte ho.
+     */
   };
 
-  /*
-   * =========================
-   * BUY NOW
-   * =========================
-   */
+  // =========================
+  // BUY NOW
+  // =========================
+
   const handleBuyNow = () => {
     navigate("/checkout", {
       state: {
@@ -256,24 +376,22 @@ function ProductDetail() {
     });
   };
 
-  /*
-   * =========================
-   * RELATED PRODUCT IMAGE
-   * =========================
-   */
+  // =========================
+  // PRODUCT IMAGE
+  // =========================
+
   const getProductImage = (item) => {
     return (
-      item.image ||
-      item.images?.[0] ||
+      item?.image ||
+      item?.images?.[0] ||
       "https://via.placeholder.com/600x600?text=Product"
     );
   };
 
-  /*
-   * =========================
-   * LOADING
-   * =========================
-   */
+  // =========================
+  // LOADING
+  // =========================
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -282,11 +400,10 @@ function ProductDetail() {
     );
   }
 
-  /*
-   * =========================
-   * ERROR
-   * =========================
-   */
+  // =========================
+  // ERROR
+  // =========================
+
   if (error || !product) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-5 text-center">
@@ -294,11 +411,13 @@ function ProductDetail() {
           Product Not Found
         </h2>
 
-        <p className="mt-2 text-sm text-[#777]">
-          {error || "This product could not be found."}
+        <p className="mt-2 max-w-md text-sm text-[#777]">
+          {error ||
+            "This product could not be found."}
         </p>
 
         <button
+          type="button"
           onClick={() => navigate(-1)}
           className="mt-6 rounded-full bg-[#242424] px-6 py-3 text-sm text-white transition hover:bg-[#A17B20]"
         >
@@ -308,38 +427,57 @@ function ProductDetail() {
     );
   }
 
-  /*
-   * =========================
-   * PRODUCT DATA
-   * =========================
-   */
+  // =========================
+  // PRODUCT DATA
+  // =========================
+
   const galleryImages = [
     product.image,
-    ...(product.images || []),
+    ...(Array.isArray(product.images)
+      ? product.images
+      : []),
   ].filter(Boolean);
 
-  const mrp = Number(product.mrp || 0);
-  const sellPrice = Number(product.sellPrice || 0);
-  const stock = Number(product.stock || 0);
+  const mrp = Number(
+    product.mrp || 0
+  );
+
+  const sellPrice = Number(
+    product.sellPrice || 0
+  );
+
+  const stock = Number(
+    product.stock || 0
+  );
 
   const discount =
     mrp > 0 && mrp > sellPrice
-      ? Math.round(((mrp - sellPrice) / mrp) * 100)
+      ? Math.round(
+          ((mrp - sellPrice) /
+            mrp) *
+            100
+        )
       : 0;
 
-  const isOutOfStock = stock <= 0;
+  const isOutOfStock =
+    stock <= 0;
 
   return (
     <main className="min-h-screen bg-white">
       {/* =========================
           BACK BUTTON
       ========================= */}
+
       <div className="mx-auto max-w-7xl px-5 pt-6 sm:px-8 lg:px-10">
         <button
+          type="button"
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-sm text-[#666] transition-colors hover:text-[#A17B20]"
         >
-          <span className="text-lg">←</span>
+          <span className="text-lg">
+            ←
+          </span>
+
           Back
         </button>
       </div>
@@ -347,17 +485,25 @@ function ProductDetail() {
       {/* =========================
           MAIN PRODUCT SECTION
       ========================= */}
+
       <section className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12 lg:px-10 lg:py-16">
         <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
           {/* =========================
               IMAGE SECTION
           ========================= */}
+
           <div>
             <div
               ref={imageContainerRef}
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
-              onTouchEnd={handleTouchEnd}
+              onMouseMove={
+                handleMouseMove
+              }
+              onMouseLeave={
+                handleMouseLeave
+              }
+              onTouchEnd={
+                handleTouchEnd
+              }
               className={`group relative overflow-hidden rounded-2xl bg-[#F7F7F5] ${
                 isZoomed
                   ? "cursor-zoom-out"
@@ -383,16 +529,19 @@ function ProductDetail() {
               </div>
 
               {/* Desktop Zoom Hint */}
+
               <div className="pointer-events-none absolute bottom-4 left-1/2 hidden -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 md:block">
                 Move cursor to zoom
               </div>
 
               {/* Mobile Zoom Hint */}
+
               <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-xs text-white md:hidden">
                 Double tap to zoom
               </div>
 
               {/* Discount */}
+
               {discount > 0 && (
                 <span className="absolute left-4 top-4 rounded-full bg-[#A17B20] px-4 py-2 text-xs font-medium text-white">
                   {discount}% OFF
@@ -400,6 +549,7 @@ function ProductDetail() {
               )}
 
               {/* Out Of Stock */}
+
               {isOutOfStock && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/25">
                   <span className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-[#242424]">
@@ -412,26 +562,36 @@ function ProductDetail() {
             {/* =========================
                 THUMBNAILS
             ========================= */}
+
             {galleryImages.length > 1 && (
               <div className="mt-4 grid grid-cols-5 gap-3">
-                {galleryImages.map((image, index) => (
-                  <button
-                    key={`${image}-${index}`}
-                    type="button"
-                    onClick={() => setSelectedImage(image)}
-                    className={`aspect-square overflow-hidden rounded-xl border-2 bg-[#F7F7F5] transition ${
-                      selectedImage === image
-                        ? "border-[#A17B20]"
-                        : "border-transparent hover:border-[#D6D6D6]"
-                    }`}
-                  >
-                    <img
-                      src={image}
-                      alt={`${product.name} ${index + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ))}
+                {galleryImages.map(
+                  (image, index) => (
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      onClick={() =>
+                        setSelectedImage(
+                          image
+                        )
+                      }
+                      className={`aspect-square overflow-hidden rounded-xl border-2 bg-[#F7F7F5] transition ${
+                        selectedImage ===
+                        image
+                          ? "border-[#A17B20]"
+                          : "border-transparent hover:border-[#D6D6D6]"
+                      }`}
+                    >
+                      <img
+                        src={image}
+                        alt={`${product.name} ${
+                          index + 1
+                        }`}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  )
+                )}
               </div>
             )}
           </div>
@@ -439,8 +599,10 @@ function ProductDetail() {
           {/* =========================
               PRODUCT INFO
           ========================= */}
+
           <div className="flex flex-col justify-center">
             {/* Brand */}
+
             {product.brand && (
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#A17B20]">
                 {product.brand}
@@ -448,27 +610,38 @@ function ProductDetail() {
             )}
 
             {/* Product Name */}
+
             <h1 className="mt-2 font-['Instrument_Serif'] text-4xl leading-tight text-[#242424] sm:text-5xl lg:text-6xl">
               {product.name}
             </h1>
 
             {/* Short Description */}
+
             {product.shortDescription && (
               <p className="mt-5 text-base leading-7 text-[#666]">
-                {product.shortDescription}
+                {
+                  product.shortDescription
+                }
               </p>
             )}
 
             {/* Price */}
+
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <span className="text-2xl font-semibold text-[#242424]">
-                ₹{sellPrice.toLocaleString("en-IN")}
+                ₹
+                {sellPrice.toLocaleString(
+                  "en-IN"
+                )}
               </span>
 
               {mrp > sellPrice && (
                 <>
                   <span className="text-lg text-[#999] line-through">
-                    ₹{mrp.toLocaleString("en-IN")}
+                    ₹
+                    {mrp.toLocaleString(
+                      "en-IN"
+                    )}
                   </span>
 
                   <span className="rounded-full bg-[#F4EBDD] px-3 py-1 text-xs font-medium text-[#A17B20]">
@@ -483,36 +656,45 @@ function ProductDetail() {
             {/* =========================
                 SPECIFICATIONS
             ========================= */}
+
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
               {product.metal && (
                 <DetailItem
                   label="Metal"
-                  value={product.metal}
+                  value={
+                    product.metal
+                  }
                 />
               )}
 
               {product.purity && (
                 <DetailItem
                   label="Purity"
-                  value={product.purity}
+                  value={
+                    product.purity
+                  }
                 />
               )}
 
               {product.metalColor && (
                 <DetailItem
                   label="Metal Color"
-                  value={product.metalColor}
+                  value={
+                    product.metalColor
+                  }
                 />
               )}
 
-              {product.grossWeight != null && (
+              {product.grossWeight !=
+                null && (
                 <DetailItem
                   label="Gross Weight"
                   value={`${product.grossWeight} g`}
                 />
               )}
 
-              {product.netWeight != null && (
+              {product.netWeight !=
+                null && (
                 <DetailItem
                   label="Net Weight"
                   value={`${product.netWeight} g`}
@@ -522,11 +704,14 @@ function ProductDetail() {
               {product.stoneType && (
                 <DetailItem
                   label="Stone"
-                  value={product.stoneType}
+                  value={
+                    product.stoneType
+                  }
                 />
               )}
 
-              {product.stoneWeight != null && (
+              {product.stoneWeight !=
+                null && (
                 <DetailItem
                   label="Stone Weight"
                   value={`${product.stoneWeight} g`}
@@ -536,21 +721,27 @@ function ProductDetail() {
               {product.stoneColor && (
                 <DetailItem
                   label="Stone Color"
-                  value={product.stoneColor}
+                  value={
+                    product.stoneColor
+                  }
                 />
               )}
 
               {product.stoneClarity && (
                 <DetailItem
                   label="Clarity"
-                  value={product.stoneClarity}
+                  value={
+                    product.stoneClarity
+                  }
                 />
               )}
 
               {product.gender && (
                 <DetailItem
                   label="Gender"
-                  value={product.gender}
+                  value={
+                    product.gender
+                  }
                 />
               )}
             </div>
@@ -558,6 +749,7 @@ function ProductDetail() {
             {/* =========================
                 STOCK
             ========================= */}
+
             <div className="mt-7">
               {isOutOfStock ? (
                 <p className="text-sm font-medium text-red-600">
@@ -577,6 +769,7 @@ function ProductDetail() {
             {/* =========================
                 QUANTITY
             ========================= */}
+
             {!isOutOfStock && (
               <div className="mt-6 flex items-center gap-4">
                 <span className="text-sm text-[#555]">
@@ -586,7 +779,9 @@ function ProductDetail() {
                 <div className="flex items-center overflow-hidden rounded-full border border-[#DCDCDC]">
                   <button
                     type="button"
-                    onClick={decreaseQuantity}
+                    onClick={
+                      decreaseQuantity
+                    }
                     className="flex h-10 w-10 items-center justify-center text-lg text-[#555] transition hover:bg-[#F5F5F3]"
                   >
                     −
@@ -598,8 +793,13 @@ function ProductDetail() {
 
                   <button
                     type="button"
-                    onClick={increaseQuantity}
-                    disabled={quantity >= stock}
+                    onClick={
+                      increaseQuantity
+                    }
+                    disabled={
+                      quantity >=
+                      stock
+                    }
                     className="flex h-10 w-10 items-center justify-center text-lg text-[#555] transition hover:bg-[#F5F5F3] disabled:cursor-not-allowed disabled:opacity-30"
                   >
                     +
@@ -611,11 +811,16 @@ function ProductDetail() {
             {/* =========================
                 ACTION BUTTONS
             ========================= */}
+
             <div className="mt-7 grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                disabled={isOutOfStock}
-                onClick={handleAddToCart}
+                disabled={
+                  isOutOfStock
+                }
+                onClick={
+                  handleAddToCart
+                }
                 className="rounded-full border border-[#242424] px-6 py-4 text-sm font-medium text-[#242424] transition hover:bg-[#242424] hover:text-white disabled:cursor-not-allowed disabled:border-[#CCC] disabled:text-[#AAA]"
               >
                 Add to Cart
@@ -623,8 +828,12 @@ function ProductDetail() {
 
               <button
                 type="button"
-                disabled={isOutOfStock}
-                onClick={handleBuyNow}
+                disabled={
+                  isOutOfStock
+                }
+                onClick={
+                  handleBuyNow
+                }
                 className="rounded-full bg-[#A17B20] px-6 py-4 text-sm font-medium text-white transition hover:bg-[#8B6819] disabled:cursor-not-allowed disabled:bg-[#CCC]"
               >
                 Buy Now
@@ -634,25 +843,32 @@ function ProductDetail() {
             {/* =========================
                 ADDITIONAL INFO
             ========================= */}
+
             <div className="mt-8 space-y-4 border-t border-[#EAEAEA] pt-7">
               {product.occasion && (
                 <InfoRow
                   label="Occasion"
-                  value={product.occasion}
+                  value={
+                    product.occasion
+                  }
                 />
               )}
 
               {product.certification && (
                 <InfoRow
                   label="Certification"
-                  value={product.certification}
+                  value={
+                    product.certification
+                  }
                 />
               )}
 
               {product.warranty && (
                 <InfoRow
                   label="Warranty"
-                  value={product.warranty}
+                  value={
+                    product.warranty
+                  }
                 />
               )}
             </div>
@@ -662,6 +878,7 @@ function ProductDetail() {
         {/* =========================
             DESCRIPTION
         ========================= */}
+
         {(product.description ||
           product.careInstructions) && (
           <div className="mt-16 border-t border-[#EAEAEA] pt-12 sm:mt-20">
@@ -673,7 +890,9 @@ function ProductDetail() {
                   </h2>
 
                   <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[#666]">
-                    {product.description}
+                    {
+                      product.description
+                    }
                   </p>
                 </div>
               )}
@@ -685,7 +904,9 @@ function ProductDetail() {
                   </h2>
 
                   <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[#666]">
-                    {product.careInstructions}
+                    {
+                      product.careInstructions
+                    }
                   </p>
                 </div>
               )}
@@ -696,6 +917,7 @@ function ProductDetail() {
         {/* =========================
             RELATED PRODUCTS
         ========================= */}
+
         <section className="mt-20 border-t border-[#EAEAEA] pt-12 sm:mt-24">
           <div className="mb-8 flex items-end justify-between gap-4">
             <div>
@@ -708,10 +930,15 @@ function ProductDetail() {
               </h2>
             </div>
 
-            {relatedProducts.length > 0 && (
+            {relatedProducts.length >
+              0 && (
               <button
                 type="button"
-                onClick={() => navigate("/products")}
+                onClick={() =>
+                  navigate(
+                    "/products"
+                  )
+                }
                 className="hidden text-sm font-medium text-[#666] transition hover:text-[#A17B20] sm:block"
               >
                 View All →
@@ -719,107 +946,152 @@ function ProductDetail() {
             )}
           </div>
 
+          {/* =========================
+              RELATED LOADING
+          ========================= */}
+
           {relatedLoading ? (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {[1, 2, 3, 4].map((item) => (
-                <div
-                  key={item}
-                  className="overflow-hidden rounded-2xl bg-[#F7F7F5]"
-                >
-                  <div className="aspect-square animate-pulse bg-[#EDEDEB]" />
-
-                  <div className="space-y-3 p-4">
-                    <div className="h-3 w-20 animate-pulse rounded bg-[#E5E5E3]" />
-                    <div className="h-5 w-3/4 animate-pulse rounded bg-[#E5E5E3]" />
-                    <div className="h-4 w-1/2 animate-pulse rounded bg-[#E5E5E3]" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : relatedProducts.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 lg:gap-6">
-              {relatedProducts.map((item) => {
-                const itemImage = getProductImage(item);
-
-                const itemMrp = Number(item.mrp || 0);
-                const itemSellPrice = Number(
-                  item.sellPrice || 0
-                );
-
-                const itemDiscount =
-                  itemMrp > 0 &&
-                  itemMrp > itemSellPrice
-                    ? Math.round(
-                        ((itemMrp - itemSellPrice) /
-                          itemMrp) *
-                          100
-                      )
-                    : 0;
-
-                return (
-                  <button
-                    key={item._id}
-                    type="button"
-                    onClick={() =>
-                      navigate(`/products/${item._id}`)
-                    }
-                    className="group text-left"
+              {[1, 2, 3, 4].map(
+                (item) => (
+                  <div
+                    key={item}
+                    className="overflow-hidden rounded-2xl bg-[#F7F7F5]"
                   >
-                    {/* Image */}
-                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-[#F7F7F5]">
-                      <img
-                        src={itemImage}
-                        alt={item.name}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      />
+                    <div className="aspect-square animate-pulse bg-[#EDEDEB]" />
 
-                      {itemDiscount > 0 && (
-                        <span className="absolute left-3 top-3 rounded-full bg-[#A17B20] px-3 py-1.5 text-[10px] font-medium text-white sm:left-4 sm:top-4 sm:text-xs">
-                          {itemDiscount}% OFF
-                        </span>
-                      )}
+                    <div className="space-y-3 p-4">
+                      <div className="h-3 w-20 animate-pulse rounded bg-[#E5E5E3]" />
 
-                      {/* Hover overlay */}
-                      <div className="absolute inset-x-0 bottom-0 hidden bg-gradient-to-t from-black/30 to-transparent p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100 sm:block">
-                        <span className="text-xs font-medium text-white">
-                          View Product →
-                        </span>
-                      </div>
+                      <div className="h-5 w-3/4 animate-pulse rounded bg-[#E5E5E3]" />
+
+                      <div className="h-4 w-1/2 animate-pulse rounded bg-[#E5E5E3]" />
                     </div>
+                  </div>
+                )
+              )}
+            </div>
+          ) : relatedProducts.length >
+            0 ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 lg:gap-6">
+              {relatedProducts.map(
+                (item) => {
+                  const itemImage =
+                    getProductImage(
+                      item
+                    );
 
-                    {/* Product Info */}
-                    <div className="mt-4">
-                      {item.brand && (
-                        <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#A17B20] sm:text-xs">
-                          {item.brand}
-                        </p>
-                      )}
+                  const itemMrp =
+                    Number(
+                      item.mrp || 0
+                    );
 
-                      <h3 className="mt-1 line-clamp-2 font-['Instrument_Serif'] text-lg leading-tight text-[#242424] transition-colors group-hover:text-[#A17B20] sm:text-xl">
-                        {item.name}
-                      </h3>
+                  const itemSellPrice =
+                    Number(
+                      item.sellPrice ||
+                        0
+                    );
 
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold text-[#242424] sm:text-base">
-                          ₹
-                          {itemSellPrice.toLocaleString(
-                            "en-IN"
-                          )}
-                        </span>
+                  const itemDiscount =
+                    itemMrp > 0 &&
+                    itemMrp >
+                      itemSellPrice
+                      ? Math.round(
+                          ((itemMrp -
+                            itemSellPrice) /
+                            itemMrp) *
+                            100
+                        )
+                      : 0;
 
-                        {itemMrp > itemSellPrice && (
-                          <span className="text-xs text-[#999] line-through">
+                  return (
+                    <button
+                      key={
+                        item._id
+                      }
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/products/${item._id}`
+                        )
+                      }
+                      className="group text-left"
+                    >
+                      {/* Image */}
+
+                      <div className="relative aspect-square overflow-hidden rounded-2xl bg-[#F7F7F5]">
+                        <img
+                          src={
+                            itemImage
+                          }
+                          alt={
+                            item.name
+                          }
+                          loading="lazy"
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+
+                        {itemDiscount >
+                          0 && (
+                          <span className="absolute left-3 top-3 rounded-full bg-[#A17B20] px-3 py-1.5 text-[10px] font-medium text-white sm:left-4 sm:top-4 sm:text-xs">
+                            {
+                              itemDiscount
+                            }
+                            % OFF
+                          </span>
+                        )}
+
+                        {/* Hover Overlay */}
+
+                        <div className="absolute inset-x-0 bottom-0 hidden bg-gradient-to-t from-black/30 to-transparent p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100 sm:block">
+                          <span className="text-xs font-medium text-white">
+                            View
+                            Product
+                            →
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Product Info */}
+
+                      <div className="mt-4">
+                        {item.brand && (
+                          <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-[#A17B20] sm:text-xs">
+                            {
+                              item.brand
+                            }
+                          </p>
+                        )}
+
+                        <h3 className="mt-1 line-clamp-2 font-['Instrument_Serif'] text-lg leading-tight text-[#242424] transition-colors group-hover:text-[#A17B20] sm:text-xl">
+                          {
+                            item.name
+                          }
+                        </h3>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-[#242424] sm:text-base">
                             ₹
-                            {itemMrp.toLocaleString(
+                            {itemSellPrice.toLocaleString(
                               "en-IN"
                             )}
                           </span>
-                        )}
+
+                          {itemMrp >
+                            itemSellPrice && (
+                            <span className="text-xs text-[#999] line-through">
+                              ₹
+                              {itemMrp.toLocaleString(
+                                "en-IN"
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                }
+              )}
             </div>
           ) : (
             <div className="rounded-2xl bg-[#F7F7F5] px-6 py-12 text-center">
@@ -829,10 +1101,17 @@ function ProductDetail() {
             </div>
           )}
 
-          {relatedProducts.length > 0 && (
+          {/* Mobile View All */}
+
+          {relatedProducts.length >
+            0 && (
             <button
               type="button"
-              onClick={() => navigate("/products")}
+              onClick={() =>
+                navigate(
+                  "/products"
+                )
+              }
               className="mt-7 w-full rounded-full border border-[#242424] px-6 py-3.5 text-sm font-medium text-[#242424] transition hover:bg-[#242424] hover:text-white sm:hidden"
             >
               View All Products
@@ -844,13 +1123,14 @@ function ProductDetail() {
   );
 }
 
-/*
- * =========================
- * SMALL COMPONENTS
- * =========================
- */
+// =========================
+// SMALL COMPONENTS
+// =========================
 
-function DetailItem({ label, value }) {
+function DetailItem({
+  label,
+  value,
+}) {
   return (
     <div>
       <p className="text-[11px] uppercase tracking-[0.15em] text-[#999]">
@@ -864,7 +1144,10 @@ function DetailItem({ label, value }) {
   );
 }
 
-function InfoRow({ label, value }) {
+function InfoRow({
+  label,
+  value,
+}) {
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <span className="text-sm text-[#888]">
