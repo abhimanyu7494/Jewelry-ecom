@@ -10,7 +10,7 @@ const registrationOTPSchema = new mongoose.Schema(
       index: true,
     },
 
-    otp: {
+    otpHash: {
       type: String,
       required: true,
     },
@@ -40,6 +40,7 @@ const registrationOTPSchema = new mongoose.Schema(
     isVerified: {
       type: Boolean,
       default: false,
+      index: true,
     },
   },
   {
@@ -47,4 +48,13 @@ const registrationOTPSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("RegistrationOTP", registrationOTPSchema);
+// Automatically remove expired OTP documents
+registrationOTPSchema.index(
+  { expiresAt: 1 },
+  { expireAfterSeconds: 0 }
+);
+
+module.exports = mongoose.model(
+  "RegistrationOTP",
+  registrationOTPSchema
+);

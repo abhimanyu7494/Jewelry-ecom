@@ -51,6 +51,8 @@ const Register = () => {
     const phone = formData.phone.trim();
     const password = formData.password;
 
+    // ================= VALIDATION =================
+
     if (!fullName || !email || !phone || !password) {
       setError("Please fill in all fields.");
       return;
@@ -75,10 +77,30 @@ const Register = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
+   // ================= PASSWORD VALIDATION =================
+
+const passwordHasMinLength = password.length >= 6;
+const passwordHasUppercase = /[A-Z]/.test(password);
+const passwordHasNumber = /\d/.test(password);
+const passwordHasSpecialChar = /[^A-Za-z0-9]/.test(password);
+
+if (
+  !passwordHasMinLength ||
+  !passwordHasUppercase ||
+  !passwordHasNumber ||
+  !passwordHasSpecialChar
+) {
+  setError(
+    "Password must contain at least 6 characters, 1 uppercase letter, 1 number, and 1 special character."
+  );
+  return;
+}
+
+    setOtpSent(true);
+    setOtpVerified(false);
+    setOtp("");
+
+    setMessage(`Sending OTP to ${email}...`);
 
     try {
       setSendingOtp(true);
@@ -94,18 +116,23 @@ const Register = () => {
       );
 
       if (response.data.success) {
-        setOtpSent(true);
-        setOtpVerified(false);
-        setOtp("");
-        setMessage(
-          `OTP has been sent to ${email}`
+        setMessage(`OTP has been sent to ${email}`);
+      } else {
+        setError(
+          response.data.message ||
+            "Unable to send OTP. Please try again."
         );
+        setMessage("");
       }
     } catch (err) {
+      console.error("Send OTP Error:", err);
+
       setError(
         err.response?.data?.message ||
           "Unable to send OTP. Please try again."
       );
+
+      setMessage("");
     } finally {
       setSendingOtp(false);
     }
@@ -273,7 +300,7 @@ const Register = () => {
 
             {otpSent && (
               <p className="mt-2 text-xs text-gray-500">
-                OTP sent to your email address.
+                OTP has been requested for this email address.
               </p>
             )}
 
@@ -302,44 +329,123 @@ const Register = () => {
 
           </div>
 
-          {/* ================= PASSWORD ================= */}
+{/* ================= PASSWORD ================= */}
 
-          <div className="mb-6">
+<div className="mb-6">
 
-            <label className="mb-2 block text-sm font-medium text-[#333]">
-              Password
-            </label>
+  <label className="mb-2 block text-sm font-medium text-[#333]">
+    Password
+  </label>
 
-            <div className="relative">
+  {/* Password Input */}
 
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                disabled={otpSent}
-                placeholder="Create a password"
-                autoComplete="new-password"
-                className="w-full rounded-xl border border-[#DCDCDC] bg-white px-4 py-3 pr-12 text-sm text-[#222] outline-none transition-all placeholder:text-gray-400 focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 disabled:cursor-not-allowed disabled:bg-gray-50"
-              />
+  <div className="relative">
 
-              <button
-                type="button"
-                onClick={() =>
-                  setShowPassword((prev) => !prev)
-                }
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-              >
-                {showPassword ? "Hide" : "Show"}
-              </button>
+    <input
+      type={showPassword ? "text" : "password"}
+      name="password"
+      value={formData.password}
+      onChange={handleChange}
+      disabled={otpSent}
+      placeholder="Create a strong password"
+      autoComplete="new-password"
+      className="w-full rounded-xl border border-[#DCDCDC] bg-white px-4 py-3 pr-16 text-sm text-[#222] outline-none transition-all placeholder:text-gray-400 focus:border-[#D4AF37] focus:ring-4 focus:ring-[#D4AF37]/10 disabled:cursor-not-allowed disabled:bg-gray-50"
+    />
 
-            </div>
+    <button
+      type="button"
+      onClick={() =>
+        setShowPassword((prev) => !prev)
+      }
+      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+    >
+      {showPassword ? "Hide" : "Show"}
+    </button>
 
-            <p className="mt-2 text-xs text-gray-400">
-              Password must contain at least 6 characters.
-            </p>
+  </div>
 
-          </div>
+  {/* ================= PASSWORD REQUIREMENTS ================= */}
+
+  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-gray-50 px-3 py-2.5">
+
+    {/* Uppercase */}
+
+    <div className="flex items-center gap-1.5">
+
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+          /[A-Z]/.test(formData.password)
+            ? "bg-green-100 text-green-600"
+            : "bg-red-100 text-red-500"
+        }`}
+      >
+        Aa
+      </span>
+
+      <span
+        className={`text-[11px] font-medium ${
+          /[A-Z]/.test(formData.password)
+            ? "text-green-600"
+            : "text-red-500"
+        }`}
+      >
+      </span>
+
+    </div>
+
+    {/* Number */}
+
+    <div className="flex items-center gap-1.5">
+
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[8px] font-bold ${
+          /\d/.test(formData.password)
+            ? "bg-green-100 text-green-600"
+            : "bg-red-100 text-red-500"
+        }`}
+      >
+        123
+      </span>
+
+      <span
+        className={`text-[11px] font-medium ${
+          /\d/.test(formData.password)
+            ? "text-green-600"
+            : "text-red-500"
+        }`}
+      >
+      </span>
+
+    </div>
+
+    {/* Special Character */}
+
+    <div className="flex items-center gap-1.5">
+
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+          /[^A-Za-z0-9]/.test(formData.password)
+            ? "bg-green-100 text-green-600"
+            : "bg-red-100 text-red-500"
+        }`}
+      >
+        !
+      </span>
+
+      <span
+        className={`text-[11px] font-medium ${
+          /[^A-Za-z0-9]/.test(formData.password)
+            ? "text-green-600"
+            : "text-red-500"
+        }`}
+      >
+      </span>
+
+    </div>
+
+  </div>
+
+</div>
 
           {/* ================= OTP ================= */}
 

@@ -1,27 +1,69 @@
 const bcrypt = require("bcryptjs");
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
 
 const User = require("../models/User");
 const RegistrationOTP = require("../models/RegistrationOTP");
 
-// ================= RESEND EMAIL =================
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp-relay.brevo.com",
+  port: Number(process.env.SMTP_PORT) || 2525,
+  secure: false, // Port 2525 uses STARTTLS
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+  // Production-friendly timeouts
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 15000,
 
-// ================= GENERATE OTP =================
+  tls: {
+    minVersion: "TLSv1.2",
+  },
+});
+
+
+const verifySMTPConnection = async () => {
+  try {
+    await transporter.verify();
+    console.log("BREVO SMTP CONNECTION SUCCESSFUL");
+
+  } catch (error) {
+    console.error("BREVO SMTP CONNECTION FAILED");
+  }
+};
+
+// Call once when server starts
+if (process.env.NODE_ENV !== "test") {
+  verifySMTPConnection();
+}
+
 
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// ================= SEND REGISTRATION OTP =================
+
+const escapeHtml = (value = "") => {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
 
 const sendRegistrationOTP = async (req, res) => {
   try {
-    const { fullName, email, phone, password } = req.body;
+    const {
+      fullName,
+      email,
+      phone,
+      password,
+    } = req.body;
 
-    // Basic validation
     if (!fullName || !email || !phone || !password) {
       return res.status(400).json({
         success: false,
@@ -30,8 +72,28 @@ const sendRegistrationOTP = async (req, res) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = fullName.trim();
+    const normalizedPhone = phone.trim();
 
-    // Check existing user
+
+    const emailRegex =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address",
+      });
+    }
+
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters",
+      });
+    }
+
     const existingUser = await User.findOne({
       email: normalizedEmail,
     });
@@ -43,131 +105,192 @@ const sendRegistrationOTP = async (req, res) => {
       });
     }
 
-    // Generate OTP
+  
     const otp = generateOTP();
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+  
+    const hashedPassword = await bcrypt.hash(
+      password,
+      12
+    );
 
-    // OTP expires in 10 minutes
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const hashedOTP = await bcrypt.hash(
+      otp,
+      10
+    );
 
-    console.log("======================================");
-    console.log("Sending registration OTP...");
-    console.log("From:", process.env.EMAIL_FROM);
-    console.log("To:", normalizedEmail);
-    console.log("======================================");
+    const expiresAt = new Date(
+      Date.now() + 10 * 60 * 1000
+    );
 
-    // ================= SEND EMAIL =================
+    console.log("SENDING REGISTRATION OTP");
 
-    const { data, error } = await resend.emails.send({
-      from: process.env.EMAIL_FROM,
-      to: [normalizedEmail],
-      subject: "Your Registration OTP",
-
-      html: `
-        <div
-          style="
-            font-family: Arial, sans-serif;
-            padding: 30px;
-            max-width: 600px;
-            margin: auto;
-            background-color: #ffffff;
-            color: #333333;
-          "
-        >
-
-          <h2 style="color: #111827;">
-            Registration Verification
-          </h2>
-
-          <p>
-            Hello <strong>${fullName}</strong>,
-          </p>
-
-          <p>
-            Thank you for registering with us.
-          </p>
-
-          <p>
-            Your OTP for registration is:
-          </p>
-
-          <div
-            style="
-              margin: 25px 0;
-              padding: 20px;
-              background-color: #f3f4f6;
-              text-align: center;
-              border-radius: 8px;
-            "
-          >
-            <h1
-              style="
-                margin: 0;
-                letter-spacing: 10px;
-                color: #2563eb;
-                font-size: 36px;
-              "
-            >
-              ${otp}
-            </h1>
-          </div>
-
-          <p>
-            This OTP will expire in
-            <strong>10 minutes</strong>.
-          </p>
-
-          <p>
-            If you did not request this registration,
-            please ignore this email.
-          </p>
-
-          <p>
-            Thank you.
-          </p>
-
-        </div>
-      `,
-    });
-
-    // ================= EMAIL ERROR =================
-
-    if (error) {
-      console.error("======================================");
-      console.error("RESEND EMAIL ERROR");
-      console.error(error);
-      console.error("======================================");
-
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send OTP email",
-      });
-    }
-
-    console.log("======================================");
-    console.log("OTP EMAIL SENT SUCCESSFULLY");
-    console.log("Email ID:", data?.id);
-    console.log("======================================");
-
-    // ================= DELETE OLD OTP =================
 
     await RegistrationOTP.deleteMany({
       email: normalizedEmail,
     });
 
-    // ================= SAVE OTP =================
-
+ 
     await RegistrationOTP.create({
-      fullName,
+      fullName: normalizedName,
       email: normalizedEmail,
-      phone,
+      phone: normalizedPhone,
       password: hashedPassword,
-      otp,
+      otpHash: hashedOTP,
       expiresAt,
       isVerified: false,
     });
+
+    const safeName = escapeHtml(normalizedName);
+
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Registration OTP</title>
+        </head>
+
+        <body
+          style="
+            margin: 0;
+            padding: 0;
+            background-color: #f3f4f6;
+            font-family: Arial, Helvetica, sans-serif;
+          "
+        >
+
+          <div
+            style="
+              max-width: 600px;
+              margin: 40px auto;
+              background: #ffffff;
+              border-radius: 12px;
+              overflow: hidden;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            "
+          >
+
+            <div
+              style="
+                padding: 24px;
+                background: #2563eb;
+                color: #ffffff;
+                text-align: center;
+              "
+            >
+              <h1 style="margin: 0; font-size: 24px;">
+                Email Verification
+              </h1>
+            </div>
+
+            <div style="padding: 32px; color: #333333;">
+
+              <p>
+                Hello <strong>${safeName}</strong>,
+              </p>
+
+              <p>
+                Thank you for registering with us.
+                Please use the OTP below to verify your email address.
+              </p>
+
+              <div
+                style="
+                  margin: 30px 0;
+                  padding: 22px;
+                  background: #f3f4f6;
+                  border-radius: 10px;
+                  text-align: center;
+                "
+              >
+
+                <div
+                  style="
+                    font-size: 12px;
+                    color: #6b7280;
+                    margin-bottom: 10px;
+                  "
+                >
+                  YOUR VERIFICATION CODE
+                </div>
+
+                <div
+                  style="
+                    font-size: 36px;
+                    font-weight: bold;
+                    letter-spacing: 10px;
+                    color: #2563eb;
+                  "
+                >
+                  ${otp}
+                </div>
+
+              </div>
+
+              <p>
+                This OTP will expire in
+                <strong>10 minutes</strong>.
+              </p>
+
+              <p style="color: #6b7280; font-size: 14px;">
+                If you did not request this registration,
+                you can safely ignore this email.
+              </p>
+
+              <p>
+                Thank you.
+              </p>
+
+            </div>
+
+            <div
+              style="
+                padding: 18px;
+                background: #f9fafb;
+                text-align: center;
+                color: #9ca3af;
+                font-size: 12px;
+              "
+            >
+              This is an automated email. Please do not reply.
+            </div>
+
+          </div>
+
+        </body>
+      </html>
+    `;
+
+    const mailInfo = await transporter.sendMail({
+      from: {
+        name: process.env.SENDER_NAME || "Your App",
+        address: process.env.SENDER_EMAIL,
+      },
+
+      to: normalizedEmail,
+
+      subject: "Your Registration OTP",
+
+      text: `
+Hello ${normalizedName},
+
+Your registration OTP is: ${otp}
+
+This OTP will expire in 10 minutes.
+
+If you did not request this registration, please ignore this email.
+      `.trim(),
+
+      html: emailHtml,
+
+      headers: {
+        "X-Auto-Response-Suppress": "All",
+      },
+    });
+    console.log("OTP EMAIL SENT SUCCESSFULLY");
+
 
     return res.status(200).json({
       success: true,
@@ -175,12 +298,7 @@ const sendRegistrationOTP = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("======================================");
     console.error("SEND OTP ERROR");
-    console.error("Name:", error.name);
-    console.error("Message:", error.message);
-    console.error("Stack:", error.stack);
-    console.error("======================================");
 
     return res.status(500).json({
       success: false,
@@ -189,11 +307,13 @@ const sendRegistrationOTP = async (req, res) => {
   }
 };
 
-// ================= VERIFY REGISTRATION OTP =================
 
 const verifyRegistrationOTP = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const {
+      email,
+      otp,
+    } = req.body;
 
     if (!email || !otp) {
       return res.status(400).json({
@@ -202,44 +322,75 @@ const verifyRegistrationOTP = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = email
+      .trim()
+      .toLowerCase();
 
-    // Find OTP
-    const registrationData = await RegistrationOTP.findOne({
-      email: normalizedEmail,
-    });
+    const normalizedOTP = otp
+      .toString()
+      .trim();
+
+    // OTP must be 6 digits
+    if (!/^\d{6}$/.test(normalizedOTP)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP format",
+      });
+    }
+
+    const registrationData =
+      await RegistrationOTP.findOne({
+        email: normalizedEmail,
+      });
 
     if (!registrationData) {
       return res.status(404).json({
         success: false,
-        message: "OTP not found. Please request a new OTP",
+        message:
+          "OTP not found. Please request a new OTP",
       });
     }
 
-    // Check OTP expiry
-    if (registrationData.expiresAt < new Date()) {
+    if (
+      registrationData.expiresAt < new Date()
+    ) {
       await RegistrationOTP.deleteOne({
         _id: registrationData._id,
       });
 
       return res.status(400).json({
         success: false,
-        message: "OTP has expired. Please request a new OTP",
+        message:
+          "OTP has expired. Please request a new OTP",
       });
     }
 
-    // Check OTP
-    if (registrationData.otp !== otp.toString()) {
+    if (registrationData.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP has already been verified",
+      });
+    }
+
+
+    const isOTPValid = await bcrypt.compare(
+      normalizedOTP,
+      registrationData.otpHash
+    );
+
+    if (!isOTPValid) {
       return res.status(400).json({
         success: false,
         message: "Invalid OTP",
       });
     }
 
-    // Mark OTP as verified
+  
     registrationData.isVerified = true;
 
     await registrationData.save();
+
+    console.log("Registration OTP verified:", normalizedEmail);
 
     return res.status(200).json({
       success: true,
@@ -257,8 +408,6 @@ const verifyRegistrationOTP = async (req, res) => {
   }
 };
 
-// ================= COMPLETE REGISTRATION =================
-
 const completeRegistration = async (req, res) => {
   try {
     const { email } = req.body;
@@ -270,13 +419,15 @@ const completeRegistration = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = email
+      .trim()
+      .toLowerCase();
 
-    // Find verified registration
-    const registrationData = await RegistrationOTP.findOne({
-      email: normalizedEmail,
-      isVerified: true,
-    });
+    const registrationData =
+      await RegistrationOTP.findOne({
+        email: normalizedEmail,
+        isVerified: true,
+      });
 
     if (!registrationData) {
       return res.status(400).json({
@@ -285,7 +436,22 @@ const completeRegistration = async (req, res) => {
       });
     }
 
-    // Check if email already exists
+  
+    if (
+      registrationData.expiresAt < new Date()
+    ) {
+      await RegistrationOTP.deleteOne({
+        _id: registrationData._id,
+      });
+
+      return res.status(400).json({
+        success: false,
+        message:
+          "Verification session expired. Please register again",
+      });
+    }
+
+ 
     const existingUser = await User.findOne({
       email: normalizedEmail,
     });
@@ -301,7 +467,6 @@ const completeRegistration = async (req, res) => {
       });
     }
 
-    // Create user
     const user = await User.create({
       fullName: registrationData.fullName,
       email: registrationData.email,
@@ -310,14 +475,15 @@ const completeRegistration = async (req, res) => {
       isEmailVerified: true,
     });
 
-    // Delete temporary registration data
+  
     await RegistrationOTP.deleteOne({
       _id: registrationData._id,
     });
 
     return res.status(201).json({
       success: true,
-      message: "Registration completed successfully",
+      message:
+        "Registration completed successfully",
 
       user: {
         id: user._id,
@@ -328,7 +494,10 @@ const completeRegistration = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Complete Registration Error:", error);
+    console.error(
+      "Complete Registration Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -337,23 +506,26 @@ const completeRegistration = async (req, res) => {
   }
 };
 
-// ================= USER LOGIN =================
-
 const userLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const {
+      email,
+      password,
+    } = req.body;
 
-    // Validation
+   
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Email and password are required",
+        message:
+          "Email and password are required",
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = email
+      .trim()
+      .toLowerCase();
 
-    // Find user
     const user = await User.findOne({
       email: normalizedEmail,
     });
@@ -361,32 +533,34 @@ const userLogin = async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message:
+          "Invalid email or password",
       });
     }
 
-    // Check email verification
     if (!user.isEmailVerified) {
       return res.status(403).json({
         success: false,
-        message: "Please verify your email before login",
+        message:
+          "Please verify your email before login",
       });
     }
 
-    // Check password
-    const isPasswordMatch = await bcrypt.compare(
-      password,
-      user.password
-    );
+    const isPasswordMatch =
+      await bcrypt.compare(
+        password,
+        user.password
+      );
 
     if (!isPasswordMatch) {
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message:
+          "Invalid email or password",
       });
     }
 
-    // Create JWT
+ 
     const token = jwt.sign(
       {
         id: user._id,
@@ -410,12 +584,16 @@ const userLogin = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
-        isEmailVerified: user.isEmailVerified,
+        isEmailVerified:
+          user.isEmailVerified,
       },
     });
 
   } catch (error) {
-    console.error("User Login Error:", error);
+    console.error(
+      "User Login Error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -423,8 +601,6 @@ const userLogin = async (req, res) => {
     });
   }
 };
-
-// ================= EXPORT =================
 
 module.exports = {
   sendRegistrationOTP,
