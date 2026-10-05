@@ -602,9 +602,30 @@ const userLogin = async (req, res) => {
   }
 };
 
+const getTotalUsers = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+
+    return res.status(200).json({
+      success: true,
+      totalUsers,
+    });
+  } catch (error) {
+    console.error("Get Total Users Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch total users",
+    });
+  }
+};
+
+
 module.exports = {
   sendRegistrationOTP,
   verifyRegistrationOTP,
   completeRegistration,
   userLogin,
+  getTotalUsers,
 };
+

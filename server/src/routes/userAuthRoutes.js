@@ -7,6 +7,7 @@ const {
   verifyRegistrationOTP,
   completeRegistration,
   userLogin,
+  getTotalUsers,
 } = require("../controllers/userAuthController");
 
 router.post("/register/send-otp", sendRegistrationOTP);
@@ -17,5 +18,6 @@ router.post("/register/complete", completeRegistration);
 
 router.post("/login", userLogin);
 
+router.get("/total", getTotalUsers);
 
 module.exports = router;

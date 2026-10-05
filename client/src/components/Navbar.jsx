@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import tejasLogo from "../assets/tejas.png";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -176,26 +177,14 @@ function Navbar() {
 
         <Link
           to="/"
-          className="group flex min-w-0 items-center gap-2 sm:gap-3"
+          className="group flex items-center"
         >
-          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#D4AF37] bg-gradient-to-br from-[#FFF8D8] via-[#D4AF37] to-[#9A761C] text-base font-bold text-white shadow-[0_4px_15px_rgba(212,175,55,0.25)] transition-all duration-500 group-hover:rotate-6 group-hover:scale-105 sm:h-11 sm:w-11 sm:text-xl">
+          <img
+            src={tejasLogo}
+            alt="Tejas Logo"
+           className="h-16 w-auto max-w-[280px] scale-125 object-contain transition-all duration-300 group-hover:scale-130 sm:h-20 sm:max-w-[320px] sm:scale-125"
 
-            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/70 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-
-            <span className="relative z-10">
-              M
-            </span>
-          </div>
-
-          <div className="min-w-0 leading-none">
-            <h1 className="whitespace-nowrap text-[18px] font-semibold tracking-wide text-[#171717] sm:text-2xl">
-              My<span className="text-[#B28A22]">Store</span>
-            </h1>
-
-            <p className="mt-1 whitespace-nowrap text-[6px] font-medium uppercase tracking-[0.20em] text-[#8A8A8A] sm:text-[9px] sm:tracking-[0.3em]">
-              Luxury Collection
-            </p>
-          </div>
+          />
         </Link>
 
         {/* ================= RIGHT SIDE ================= */}

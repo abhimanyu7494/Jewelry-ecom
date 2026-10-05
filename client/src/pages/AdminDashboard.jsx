@@ -6,14 +6,54 @@ import AdminNavbar from "../components/AdminNavbar";
 function AdminDashboard() {
   const navigate = useNavigate();
 
-  const [totalCollections, setTotalCollections] = useState(0);
-  const [totalProducts, setTotalProducts] = useState(0);
-  const [totalStock, setTotalStock] = useState(0);
+  const [totalCollections, setTotalCollections] =
+    useState(0);
 
-  const [loading, setLoading] = useState(true);
+  const [totalProducts, setTotalProducts] =
+    useState(0);
+
+  const [totalStock, setTotalStock] =
+    useState(0);
+
+  const [totalUsers, setTotalUsers] =
+    useState(0);
+
+  const [loading, setLoading] =
+    useState(true);
 
   // =========================
-  // Fetch Dashboard Stats
+  // GET ARRAY FROM API RESPONSE
+  // =========================
+
+  const extractArray = (response, keys = []) => {
+    const data = response?.data;
+
+    // Direct array
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    // Check provided keys
+    for (const key of keys) {
+      if (Array.isArray(data?.[key])) {
+        return data[key];
+      }
+    }
+
+    // Common API response formats
+    if (Array.isArray(data?.data)) {
+      return data.data;
+    }
+
+    if (Array.isArray(data?.results)) {
+      return data.results;
+    }
+
+    return [];
+  };
+
+  // =========================
+  // FETCH DASHBOARD STATS
   // =========================
 
   useEffect(() => {
@@ -21,42 +61,119 @@ function AdminDashboard() {
   }, []);
 
   const fetchDashboardStats = async () => {
+    setLoading(true);
+
+    // =========================
+    // FETCH CATEGORIES
+    // =========================
+
     try {
-      const [categoriesResponse, productsResponse] =
-        await Promise.all([
-          api.get("/categories"),
-          api.get("/products"),
-        ]);
+      const categoriesResponse =
+        await api.get("/categories");
 
-      const categories = categoriesResponse.data;
-      const products = productsResponse.data;
+      console.log(
+        "Categories API:",
+        categoriesResponse.data
+      );
 
-      // Total Collections
-      setTotalCollections(categories.length);
+      const categories = extractArray(
+        categoriesResponse,
+        ["categories"]
+      );
+
+      setTotalCollections(
+        categories.length
+      );
+    } catch (error) {
+      console.error(
+        "Categories fetch error:",
+        error
+      );
+
+      setTotalCollections(0);
+    }
+
+    // =========================
+    // FETCH PRODUCTS
+    // =========================
+
+    try {
+      const productsResponse =
+        await api.get("/products");
+
+      console.log(
+        "Products API:",
+        productsResponse.data
+      );
+
+      const products = extractArray(
+        productsResponse,
+        ["products"]
+      );
 
       // Total Products
-      setTotalProducts(products.length);
+      setTotalProducts(
+        products.length
+      );
 
       // Total Stock
       const stock = products.reduce(
-        (total, product) =>
-          total + Number(product.stock || 0),
+        (total, product) => {
+          return (
+            total +
+            Number(
+              product?.stock || 0
+            )
+          );
+        },
         0
       );
 
       setTotalStock(stock);
     } catch (error) {
       console.error(
-        "Failed to fetch dashboard stats:",
+        "Products fetch error:",
         error
       );
-    } finally {
-      setLoading(false);
+
+      setTotalProducts(0);
+      setTotalStock(0);
     }
+
+    // =========================
+    // FETCH TOTAL USERS
+    // =========================
+
+    try {
+      const usersResponse =
+        await api.get("/auth/total");
+
+      console.log(
+        "Users API:",
+        usersResponse.data
+      );
+
+      const usersCount =
+        Number(
+          usersResponse.data?.totalUsers ||
+          0
+        );
+
+      setTotalUsers(usersCount);
+    } catch (error) {
+      console.error(
+        "Users fetch error:",
+        error
+      );
+
+      setTotalUsers(0);
+    }
+
+    setLoading(false);
   };
 
   // =========================
-  // Classes
+  // STAT CARD
   // =========================
 
   const statCard =
@@ -68,7 +185,7 @@ function AdminDashboard() {
       <AdminNavbar />
 
       {/* =========================
-          Background
+          BACKGROUND
       ========================= */}
 
       <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
@@ -84,7 +201,7 @@ function AdminDashboard() {
         <div className="mx-auto max-w-7xl">
 
           {/* =========================
-              Header
+              HEADER
           ========================= */}
 
           <div className="mb-8">
@@ -100,18 +217,17 @@ function AdminDashboard() {
             <div className="mt-3 h-px w-12 bg-[#D4AF37]" />
 
             <p className="mt-3 text-sm text-[#888]">
-              Overview of your store inventory and collections.
+              Overview of your store
+              inventory and collections.
             </p>
 
           </div>
-
 
           {/* =========================
               STAT CARDS
           ========================= */}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
             {/* =========================
                 COLLECTIONS
@@ -119,7 +235,9 @@ function AdminDashboard() {
 
             <div
               onClick={() =>
-                navigate("/admin/collections")
+                navigate(
+                  "/admin/collections"
+                )
               }
               className={statCard}
             >
@@ -143,7 +261,6 @@ function AdminDashboard() {
                   </p>
 
                 </div>
-
 
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#FFF9E8] text-[#B88A16]">
 
@@ -174,7 +291,6 @@ function AdminDashboard() {
 
               </div>
 
-
               <div className="mt-5 h-px bg-gradient-to-r from-[#D4AF37]/40 to-transparent" />
 
               <p className="mt-3 text-xs font-medium text-[#A17B20] transition group-hover:translate-x-1">
@@ -183,14 +299,15 @@ function AdminDashboard() {
 
             </div>
 
-
             {/* =========================
                 PRODUCTS
             ========================= */}
 
             <div
               onClick={() =>
-                navigate("/admin/products")
+                navigate(
+                  "/admin/products"
+                )
               }
               className={statCard}
             >
@@ -214,7 +331,6 @@ function AdminDashboard() {
                   </p>
 
                 </div>
-
 
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F7F4EA] text-[#B88A16]">
 
@@ -245,7 +361,6 @@ function AdminDashboard() {
 
               </div>
 
-
               <div className="mt-5 h-px bg-gradient-to-r from-[#D4AF37]/40 to-transparent" />
 
               <p className="mt-3 text-xs font-medium text-[#A17B20] transition group-hover:translate-x-1">
@@ -254,14 +369,15 @@ function AdminDashboard() {
 
             </div>
 
-
             {/* =========================
-                TOTAL STOCK
+                INVENTORY
             ========================= */}
 
             <div
               onClick={() =>
-                navigate("/admin/products")
+                navigate(
+                  "/admin/products"
+                )
               }
               className={statCard}
             >
@@ -285,7 +401,6 @@ function AdminDashboard() {
                   </p>
 
                 </div>
-
 
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F4F3EF] text-[#A17B20]">
 
@@ -316,11 +431,82 @@ function AdminDashboard() {
 
               </div>
 
-
               <div className="mt-5 h-px bg-gradient-to-r from-[#D4AF37]/40 to-transparent" />
 
               <p className="mt-3 text-xs font-medium text-[#A17B20] transition group-hover:translate-x-1">
                 Manage Inventory →
+              </p>
+
+            </div>
+
+            {/* =========================
+                USERS
+            ========================= */}
+
+            <div
+              className={statCard}
+            >
+
+              <div className="flex items-start justify-between">
+
+                <div>
+
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[#999]">
+                    Users
+                  </p>
+
+                  <h2 className="mt-3 font-['Instrument_Serif'] text-4xl text-[#222]">
+                    {loading
+                      ? "..."
+                      : totalUsers}
+                  </h2>
+
+                  <p className="mt-1 text-xs text-[#999]">
+                    Total registered users
+                  </p>
+
+                </div>
+
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F7F4EA] text-[#B88A16]">
+
+                  <svg
+                    className="h-6 w-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+
+                    <path
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                    />
+
+                    <circle
+                      cx="9"
+                      cy="7"
+                      r="4"
+                      strokeWidth="1.6"
+                    />
+
+                    <path
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"
+                    />
+
+                  </svg>
+
+                </div>
+
+              </div>
+
+              <div className="mt-5 h-px bg-gradient-to-r from-[#D4AF37]/40 to-transparent" />
+
+              <p className="mt-3 text-xs font-medium text-[#A17B20]">
+                Registered Users
               </p>
 
             </div>
